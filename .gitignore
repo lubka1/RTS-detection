@@ -2,3 +2,11 @@ data/
 *.h5
 *.ipynb
 copies and old files/
+*.zip
+new_data_utils.py
+output.log
+wandb/
+__pycache__/
+important.txt
+multi_train.py
+wandb_model.keras

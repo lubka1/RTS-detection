@@ -1,3 +1,11 @@
 numpy
-opencv-python
--c conda-forge gdal
+# conda install -c conda-forge gdal
+pandas
+scipy
+matplotlib
+rasterio
+tensorflow==2.4.0
+keras==2.4.3
+segmentation-models
+albumentations
+wandb

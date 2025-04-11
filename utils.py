@@ -1,200 +1,171 @@
+import config  # Import settings from config.py
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import rasterio
 import albumentations as A
-import keras
+import tensorflow.keras as keras
+import segmentation_models as sm
+import tensorflow as tf
+from tensorflow.keras import layers, Model, Input
+import fusion
 
-def read_tif(file_path, as_gray=False, normalize=True):
-    with rasterio.open(file_path) as src:
-        if as_gray:
-            # Read the first band only for grayscale
-            data = src.read(1)
-        else:
-            # Read all bands
-            data = src.read()
-            if data.shape[0] > 1:  # If the data has multiple 
-                data = np.transpose(data, (1, 2, 0))  # Reordero to (height, width, channels)
+BACKBONE = config.BACKBONE
+BATCH_SIZE = config.BATCH_SIZE
+LR = config.LR
+EPOCHS = config.EPOCHS
+preprocess_input = sm.get_preprocessing(BACKBONE)
 
-            if normalize:
-                # Normalize each band separately
-                data = data.astype(np.float32)
-                for i in range(data.shape[-1]):  # Normalize each band
-                    band = data[..., i]
-                    data[..., i] = normalize_image(band)    
-        return data  
+activation = 'sigmoid' 
+optim = keras.optimizers.Adam(LR)
+total_loss = sm.losses.binary_focal_dice_loss
+
+def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_learning=False, model_path=None):
+    """
+    Loads the correct model architecture and applies saved weights if provided.
+    """
+    encoder_weights = None  # default
+
+    if transfer_learning:
+        encoder_weights = 'imagenet'
     
-"""def normalize_image(image):
-    Normalize the image to the range [0, 1].
-    image_min = image.min()
-    image_max = image.max()
-    return (image - image_min) / (image_max - image_min)"""
-
-def normalize_image(image):
-    """Normalize the image to the range [0, 1]."""
-    image_min = image.min()
-    image_max = image.max()
-    if image_min != image_max:
-        return (image - image_min) / (image_max - image_min)
+    if fusion_type == 'early':
+        model = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape=(None, None, N))
+    elif fusion_type == 'middle':
+        model = sm.MiddleUnet('midresnet50', 'resnet50', encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape1=(None, None, M), input_shape2=(None, None, N))
+    elif fusion_type == 'late':
+        model = construct_late_unet(M,N, strategy, attention=attention, encoder_weights=encoder_weights)
     else:
-        return image-image_min
-
-# helper function for data visualization    
-def denormalize(x):
-    """Scale image to range 0..1 for correct plot"""
-    x_max = np.percentile(x, 98)
-    x_min = np.percentile(x, 2)    
-    x = (x - x_min) / (x_max - x_min)
-    x = x.clip(0, 1)
-    return x
+        raise Exception("Model type not recognized.")
     
-def calculate_ndvi( nir_band, red_band):
-    ndvi = (nir_band - red_band) / (nir_band + red_band + 1e-10)  # Adding a small constant to avoid division by zero
-    return ndvi
-
-
-# classes for data loading and preprocessing
-class Dataset:
-    """ Dataset. Read images, apply augmentation and preprocessing transformations.
+    # Get the first convolutional layer
+    first_layer = model.layers[0]
     
-    Args:
-        images_dir (str): path to images folder
-        masks_dir (str): path to segmentation masks folder
-        class_values (list): values of classes to extract from segmentation mask
-        augmentation (albumentations.Compose): data transfromation pipeline 
-            (e.g. flip, scale, etc.)
-        preprocessing (albumentations.Compose): data preprocessing 
-            (e.g. noralization, shape manipulation, etc.)
-        fusion (bool): whether to use fusion with another set of images
-        images_dir2 (str): path to the second set of images folder (for fusion)    
-        ndvi (bool): whether to calculate and include NDVI as an additional channel
+    # If transfer_learning is True and N > 3, modify the first layer weights
+    if transfer_learning and N > 3:
+        # Reinitialize the first layer's weights (since it doesn't match pretrained weights for N > 3)
+        first_layer.set_weights([tf.random.normal(w.shape) for w in first_layer.get_weights()])  # Random initialization
+        # Load the pretrained weights for all layers except the first layer
+    if encoder_weights == 'imagenet' and N <= 3:
+        model.load_weights(model_path, by_name=True, skip_mismatch=True)
+     
+    
+    # Load saved weights if provided, for testing purposes
+    if model_path:
+        model.load_weights(model_path)
+
+    return model
+
+def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights=None):
     """
-    # in case of fusion and ndvi the order of the bands is: S2, S1, ndvi
-
-    CLASSES = ['rts']
+    Constructs a Late Fusion U-Net model with various fusion options.
     
-    def __init__(
-            self, 
-            images_dir, 
-            masks_dir, 
-            classes=None, 
-            augmentation=None, 
-            preprocessing=None,
-            fusion=False,
-            images_dir2=None,
-            ndvi=False,
-    ):
-        self.ids = os.listdir(images_dir)
-        self.images_fps = [os.path.join(images_dir, image_id) for image_id in self.ids]
-        self.masks_fps = [os.path.join(masks_dir, image_id) for image_id in self.ids]
-
-        self.fusion = fusion
-        if self.fusion:
-            assert images_dir2 is not None, "When fusion is enabled, images_dir2 must be provided."
-            self.images_fps2 = [os.path.join(images_dir2, image_id) for image_id in self.ids]
-        
-        # convert str names to class values on masks
-        self.class_values = [self.CLASSES.index(cls.lower()) for cls in classes] # check if I shouldnt remove this?
-        
-        self.augmentation = augmentation
-        self.preprocessing = preprocessing
-        self.ndvi = ndvi
+    Parameters:
+    - M: Number of channels for input1
+    - N: Number of channels for input2
+    - fusion_type: Fusion strategy ('attention', 'channel', 'concat')
+    - mode: Fusion mode ('average', 'residual', 'concat')
     
-    def __getitem__(self, i):
- # takze tuto citam uz normalized image, asi uz nepotrebujem to dat na float
-        image1 = read_tif(self.images_fps[i]).astype(np.float32) # np.uint16
-
-        # fusion of S2 and S1
-        if self.fusion:
-            image2 = read_tif(self.images_fps2[i]).astype(np.float32) # np.uint16
-            image = np.concatenate((image1, image2), axis=-1)
-        else:
-            image = image1
-
-        # Concatenate NDVI as a new channel if required
-        if self.ndvi:
-            red_band = image1[:, :, 3]  # Band 4
-            nir_band = image1[:, :, 7]  # Band 8
-            ndvi = calculate_ndvi(nir_band, red_band)
-            ndvi = np.expand_dims(ndvi, axis=2)  # Expand dims to add as a channel
-            #print(red_band.shape,ndvi.shape)
-            image = np.concatenate((image, ndvi), axis=-1)    
-
-        mask = read_tif(self.masks_fps[i], as_gray=True)
-        mask_array = np.array(mask)
-        mask = (mask_array / 250).astype(np.uint16)
-        #masks = [(mask == v) for v in self.class_values]
-        masks = [(~(mask == v)) for v in self.class_values]  # Inverting the boolean mask
-        mask = np.stack(masks, axis=-1).astype('float')
-        
-        # apply augmentations
-        if self.augmentation:
-            sample = self.augmentation(image=image, mask=mask)
-            image, mask = sample['image'], sample['mask']
-        
-        # apply preprocessing
-        if self.preprocessing:
-            sample = self.preprocessing(image=image, mask=mask)
-            image, mask = sample['image'], sample['mask']
-            
-        return image, mask
-        
-    def __len__(self):
-        return len(self.ids)
-    
-    
-class Dataloder(keras.utils.Sequence):
-    """Load data from dataset and form batches
-    
-    Args:
-        dataset: instance of Dataset class for image loading and preprocessing.
-        batch_size: Integet number of images in batch.
-        shuffle: Boolean, if `True` shuffle image indexes each epoch.
+    Returns:
+    - Compiled Keras Model
     """
     
-    def __init__(self, dataset, batch_size=1, shuffle=False):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        self.indexes = np.arange(len(dataset))
-
-        self.on_epoch_end()
-
-    def __getitem__(self, i):
-        
-        # collect batch data
-        start = i * self.batch_size
-        stop = (i + 1) * self.batch_size
-        data = []
-        for j in range(start, stop):
-            data.append(self.dataset[j])
-        
-        # transpose list of lists
-        batch = [np.stack(samples, axis=0) for samples in zip(*data)]
-        
-        return batch
+    model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape=(None, None, M), late_fusion=True, input_shape2=(None, None, N))   # S1
+    model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape=(None, None, N), late_fusion=True, input_shape2=(None, None, M))   # S2
     
+    # Input layers
+    input1 = Input(shape=(None, None, M))  # S1
+    input2 = Input(shape=(None, None, N))  # S2
+
+    # Extract feature maps
+    features1 = model1(input1)  
+    features2 = model2(input2)
+
+        # Optional Attention
+    if attention == 'grid': 
+        attention_layer = fusion.GridAttention() # GridAttention is a cross-attention mechanism — it takes two inputs
+        features1 = attention_layer(features1, features2)
+        features2 = attention_layer(features2, features1)
+
+    elif attention == 'channel': # ChannelGate is a self-attention mechanism — it only needs its own feature map to decide which channels are important.
+        channel_gate1 = fusion.ChannelGate(features1.shape[-1])
+        channel_gate2 = fusion.ChannelGate(features2.shape[-1])
+        features1 = channel_gate1(features1)
+        features2 = channel_gate2(features2)
+
+    x = [features1, features2]
+
+    if strategy == 'concat':
+        fusion_output = layers.Concatenate(axis=-1, name="concat_features")(x)
+    elif strategy == 'average':
+        fusion_output = fusion.WeightedAverage(n_output=len(x))(x)
+
+    # Apply final convolution layer
+    output = layers.Conv2D(
+        filters=1,  # Number of output classes (e.g., binary segmentation)
+        kernel_size=(3, 3),
+        padding='same',
+        use_bias=True,
+        kernel_initializer='glorot_uniform',
+        name='final_conv'
+    )(fusion_output)
+
+    output = layers.Activation(activation)(output)
+
+    # Define and compile model
+    model = Model(inputs=[input1, input2], outputs=output)
+
+    return model
+
+
+# for plotting training and validation
+# maybe i wont need it when i use wandb
+def plot_history(history):
+    """
+    Plot training and validation metrics from the history object.
+
+    Parameters:
+    history: keras.callbacks.History
+        The history object returned by model.fit(), containing training and validation metrics.
+
+    Returns:
+    None
+    """
+    # Print available metrics
+    #print("Available metrics in history:", history.history.keys())
     
-    def __len__(self):
-        """Denotes the number of batches per epoch"""
-        return len(self.indexes) // self.batch_size
+    # Extract metric names
+    metric_1 = list(history.history.keys())[0]  # First metric (binary iou)
+    metric_2 = list(history.history.keys())[1]  # loss
     
-    def on_epoch_end(self):
-        """Callback function to shuffle indexes each epoch"""
-        if self.shuffle:
-            self.indexes = np.random.permutation(self.indexes)   
+    val_metric_1 = list(history.history.keys())[2]  # Validation for the first metric
+    val_metric_2 = list(history.history.keys())[3]  # Validation for the second metric
+    
+    # Plot training and validation metrics
+    plt.figure(figsize=(30, 5))
+    
+    # Subplot 1: First metric (binary iou)
+    plt.subplot(121)
+    plt.plot(history.history[metric_1])
+    plt.plot(history.history[val_metric_1])
+    plt.title(metric_1)
+    plt.ylabel(metric_1)
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Validation'], loc='upper left')
+    
+    # Subplot 2: Second metric (loss)
+    plt.subplot(122)
+    plt.plot(history.history[metric_2])
+    plt.plot(history.history[val_metric_2])
+    plt.title(metric_2)
+    plt.ylabel(metric_2)
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Validation'], loc='upper left')
+    
+    # Show the plots
+    plt.show()
 
-
-
-class MyDataGenerator:
-    def __init__(self, shuffle=True, seed=42):
-        self.shuffle = shuffle
-        self.random_state = np.random.RandomState(seed)  # Create a local random state
-
-    def on_epoch_end(self):
-        """Shuffle indexes each epoch using a fixed random state"""
-        if self.shuffle:
-            self.indexes = self.random_state.permutation(self.indexes)
 
 
 # AUGMENTATION            
@@ -203,47 +174,18 @@ def round_clip_0_1(x, **kwargs):
     return x.round().clip(0, 1)
 
 train_transform = [
+        A.HorizontalFlip(p=0.5),  # Randomly flip images horizontally
+        A.VerticalFlip(p=0.5),    # Randomly flip images vertically
+        A.RandomRotate90(p=0.5),   # Randomly rotate images by multiples of 90°
+        A.Blur(blur_limit=3, p=0.5),  # Randomly blur images
+     #   A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),  # Optional: Add noise
+     #   A.PadIfNeeded(min_height=256, min_width=256, always_apply=True, border_mode=0, value=0),
+     #   A.Lambda(mask=round_clip_0_1, name="round_clip_0_1")  # Apply masking function if needed
+    ]
 
-    A.HorizontalFlip(p=0.5),
-
-    A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, shift_limit=0.1, p=1, border_mode=0),
-
-    A.PadIfNeeded(min_height=256, min_width=256, always_apply=True, border_mode=0, value=0 ),
-    
-    A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),  
-    A.Perspective(p=0.5),
-
-    A.OneOf(
-        [
-            A.RandomGamma(p=1),
-            A.RandomCrop(height=256, width=256),
-        ],
-        p=0.9,
-    ),
-
-    A.OneOf(
-        [
-            A.Sharpen(p=1),
-            A.Blur(blur_limit=3, p=1),
-            A.MotionBlur(blur_limit=3, p=1),
-        ],
-        p=0.9,
-    ),
-
-    A.OneOf(
-        [
-            A.VerticalFlip(p=0.5),
-            A.RandomRotate90(p=0.5,) 
-        ],
-        p=0.9,
-    ),
-    A.Lambda(mask=round_clip_0_1)
-]
-
-# define heavy augmentations
 def get_training_augmentation(train_transform=train_transform):
-    return A.Compose(train_transform)
-
+    #   return A.Compose(train_transform)
+    return A.Compose(train_transform, additional_targets={'image2': 'image'})
 
 def get_preprocessing(preprocessing_fn):
     """Construct preprocessing transform
