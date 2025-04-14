@@ -12,11 +12,7 @@ Permafrost degradation is a critical issue in Arctic environments, and RTS detec
 - **Fusion**: Early, Middle and Late data fusion 
 - **Framework**: Keras
 
-## 📁 Project Structure
-. ├── custom_classification_models/ # Custom model definitions ├── segmentation_models/ # Prebuilt segmentation architectures ├── ArcticDEM.ipynb # Notebook for ArcticDEM analysis ├── config.py # Configurations and hyperparameters ├── data_utils.py # Dataset loading and preparation ├── fusion.py # Data fusion logic for S1 and S2 ├── predict.py # Inference script ├── test.py # Evaluation script ├── train.py # Model training pipeline ├── utils.py # Utility functions ├── requirements.txt # Python dependencies └── .gitignore
 
-
----
 
 
 
