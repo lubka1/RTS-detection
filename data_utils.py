@@ -101,12 +101,13 @@ def get_data(fusion_type):
 
 
         return train_dataloader, valid_dataloader, N, M
-
+'''
 def read_tif(file_path, as_gray=False, normalize=True):
     with rasterio.open(file_path) as src:
         if as_gray:
             # Read the first band only for grayscale
             data = src.read(1)
+            data = data.astype(np.float32)
         else:
             # Read all bands
             data = src.read()
@@ -120,7 +121,32 @@ def read_tif(file_path, as_gray=False, normalize=True):
                     band = data[..., i]
                     data[..., i] = normalize_image(band)    
         return data  
-    
+'''  
+def read_tif(file_path, as_gray=False, normalize=True, bands=None):
+    with rasterio.open(file_path) as src:
+        if as_gray:
+            data = src.read(1).astype(np.float32)
+        else:
+            if bands is not None:
+                # Convert band indices from human-readable (1-based) to 0-based indexing
+                bands_zero_indexed = [b for b in bands]
+                data = np.stack([src.read(b).astype(np.float32) for b in bands_zero_indexed], axis=-1)
+            else:
+                data = src.read().astype(np.float32)
+                if data.shape[0] > 1:
+                    data = np.transpose(data, (1, 2, 0))
+
+            if normalize:
+                if bands is not None:
+                    for i in range(data.shape[-1]):
+                        band = data[..., i]
+                        data[..., i] = normalize_image(band)
+                else:
+                    for i in range(data.shape[-1]):
+                        band = data[..., i]
+                        data[..., i] = normalize_image(band)
+
+        return data  
 
 def normalize_image(image):
     """Normalize the image to the range [0, 1]."""
@@ -195,11 +221,11 @@ class Dataset:
         self.ndvi = ndvi
     
     def __getitem__(self, i):
-        image1 = read_tif(self.images_fps[i]).astype(np.float32) # np.uint16
+        image1 = read_tif(self.images_fps[i]).astype(np.float32) 
 
         # fusion of S2 and S1
         if self.fusion:
-            image2 = read_tif(self.images_fps2[i]).astype(np.float32) # np.uint16
+            image2 = read_tif(self.images_fps2[i]).astype(np.float32) 
             image = np.concatenate((image1, image2), axis=-1)
         else:
             image = image1
@@ -215,10 +241,11 @@ class Dataset:
 
         mask = read_tif(self.masks_fps[i], as_gray=True)
         mask_array = np.array(mask)
-        mask = (mask_array / 250).astype(np.uint16)
+        mask = (mask_array / 250).astype(np.float32)
         #masks = [(mask == v) for v in self.class_values]
         masks = [(~(mask == v)) for v in self.class_values]  # Inverting the boolean mask
         mask = np.stack(masks, axis=-1).astype('float')
+        print(f"final mask shape: {mask.shape}")  # Add this line
         
         # apply augmentations
         if self.augmentation:
@@ -278,7 +305,7 @@ class EarlyDataset:
     def __getitem__(self, i):
  # takze tuto citam uz normalized image, asi uz nepotrebujem to dat na float
         # Read Sentinel-1 image (assumed to be float32 after normalization)
-        s1_image = read_tif(self.s1_fps[i]).astype(np.float32) # np.uint16
+        s1_image = read_tif(self.s1_fps[i]).astype(np.float32) 
         # add slope and elevation
         dem_data = read_tif(self.dem_fps[i]).astype(np.float32)
         s1_image = np.concatenate((s1_image, dem_data), axis=-1)
@@ -298,7 +325,7 @@ class EarlyDataset:
 
         mask = read_tif(self.masks_fps[i], as_gray=True)
         mask_array = np.array(mask)
-        mask = (mask_array / 250).astype(np.uint16)
+        mask = (mask_array / 250).astype(np.float32)
         #masks = [(mask == v) for v in self.class_values]
         masks = [(~(mask == v)) for v in self.class_values]  # Inverting the boolean mask
         mask = np.stack(masks, axis=-1).astype('float')
@@ -373,21 +400,23 @@ class FusionDataset(Dataset):
     
     def __getitem__(self, i):
         image1 = read_tif(self.images_fps[i]).astype(np.float32)
-        dem_data = read_tif(self.dem_fps[i]).astype(np.float32)
+        dem_data = read_tif(self.dem_fps[i], as_gray=True).astype(np.float32) # CHANGE
+        dem_data = dem_data[..., np.newaxis]  # CHANGE
         image1 = np.concatenate((image1, dem_data), axis=-1)
 
-        image2 = read_tif(self.images_fps2[i]).astype(np.float32)
-        
+        image3 = read_tif(self.images_fps2[i], bands=[3,9]).astype(np.float32) # CHANGE
+        image2 = read_tif(self.images_fps2[i]).astype(np.float32) # CHANGE
+
         if self.ndvi:
             red_band = image2[:, :, 2]
             nir_band = image2[:, :, 6]
             ndvi = calculate_ndvi(nir_band, red_band)
             ndvi = np.expand_dims(ndvi, axis=2)
-            image2 = np.concatenate((image2, ndvi), axis=-1)    
+            image2 = np.concatenate((image3, ndvi), axis=-1)     # CHANGE
         
         mask = read_tif(self.masks_fps[i], as_gray=True)
         mask_array = np.array(mask)
-        mask = (mask_array / 250).astype(np.uint16)
+        mask = (mask_array / 250).astype(np.float32)
         masks = [(~(mask == v)) for v in self.class_values]
         mask = np.stack(masks, axis=-1).astype('float')
         

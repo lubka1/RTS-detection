@@ -17,31 +17,33 @@ LR = config.LR
 EPOCHS = config.EPOCHS
 preprocess_input = sm.get_preprocessing(BACKBONE)
 
-activation = 'sigmoid' 
-optim = keras.optimizers.Adam(LR)
-total_loss = sm.losses.binary_focal_dice_loss
+
 
 def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_learning=False, model_path=None):
     """
     Loads the correct model architecture and applies saved weights if provided.
     """
+    print("[DEBUG] transfer_learning received in load_model:", transfer_learning)
+
     encoder_weights = None  # default
 
     if transfer_learning:
         encoder_weights = 'imagenet'
+        print("Using Imagenet pre-trained weights")
     
     if fusion_type == 'early':
-        model = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape=(None, None, N))
+        model = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
     elif fusion_type == 'middle':
-        model = sm.MiddleUnet('midresnet50', 'resnet50', encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape1=(None, None, M), input_shape2=(None, None, N))
+        model = sm.MiddleUnet('midresnet50', 'resnet50', encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape1=(None, None, M), input_shape2=(None, None, N))
     elif fusion_type == 'late':
         model = construct_late_unet(M,N, strategy, attention=attention, encoder_weights=encoder_weights)
     else:
         raise Exception("Model type not recognized.")
     
+    '''
     # Get the first convolutional layer
     first_layer = model.layers[0]
-    
+
     # If transfer_learning is True and N > 3, modify the first layer weights
     if transfer_learning and N > 3:
         # Reinitialize the first layer's weights (since it doesn't match pretrained weights for N > 3)
@@ -49,7 +51,7 @@ def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_lea
         # Load the pretrained weights for all layers except the first layer
     if encoder_weights == 'imagenet' and N <= 3:
         model.load_weights(model_path, by_name=True, skip_mismatch=True)
-     
+    '''
     
     # Load saved weights if provided, for testing purposes
     if model_path:
@@ -70,9 +72,10 @@ def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights
     Returns:
     - Compiled Keras Model
     """
-    
-    model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape=(None, None, M), late_fusion=True, input_shape2=(None, None, N))   # S1
-    model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=activation, input_shape=(None, None, N), late_fusion=True, input_shape2=(None, None, M))   # S2
+    print("[DEBUG] transfer_learning received in construct late unet:", encoder_weights)
+
+    model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M), late_fusion=True, input_shape2=(None, None, N))   # S1
+    model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N), late_fusion=True, input_shape2=(None, None, M))   # S2
     
     # Input layers
     input1 = Input(shape=(None, None, M))  # S1
@@ -111,7 +114,7 @@ def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights
         name='final_conv'
     )(fusion_output)
 
-    output = layers.Activation(activation)(output)
+    output = layers.Activation(config.activation)(output)
 
     # Define and compile model
     model = Model(inputs=[input1, input2], outputs=output)
@@ -166,7 +169,13 @@ def plot_history(history):
     # Show the plots
     plt.show()
 
-
+def f_score(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    tp = tf.reduce_sum(y_true * y_pred)
+    fp = tf.reduce_sum((1 - y_true) * y_pred)
+    fn = tf.reduce_sum(y_true * (1 - y_pred))
+    return tp / (tp + 0.5 * (fp + fn))
 
 # AUGMENTATION            
 
@@ -178,9 +187,6 @@ train_transform = [
         A.VerticalFlip(p=0.5),    # Randomly flip images vertically
         A.RandomRotate90(p=0.5),   # Randomly rotate images by multiples of 90°
         A.Blur(blur_limit=3, p=0.5),  # Randomly blur images
-     #   A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),  # Optional: Add noise
-     #   A.PadIfNeeded(min_height=256, min_width=256, always_apply=True, border_mode=0, value=0),
-     #   A.Lambda(mask=round_clip_0_1, name="round_clip_0_1")  # Apply masking function if needed
     ]
 
 def get_training_augmentation(train_transform=train_transform):

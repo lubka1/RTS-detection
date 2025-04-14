@@ -32,9 +32,6 @@ LR = config.LR
 EPOCHS = config.EPOCHS
 preprocess_input = sm.get_preprocessing(BACKBONE)
 
-activation = 'sigmoid' 
-optim = keras.optimizers.Adam(LR)
-total_loss = sm.losses.binary_focal_dice_loss
 
 def train_model(fusion_type, strategy='concat', attention=None ,transfer_learning=False):
         
@@ -51,6 +48,8 @@ def train_model(fusion_type, strategy='concat', attention=None ,transfer_learnin
         
         
         print(f"\nStarting training with fusion type: {fusion_type}")
+        print("[DEBUG] transfer_learning inside train_model:", transfer_learning)
+
 
         # Initialize wandb
         wandb.init(
@@ -71,16 +70,19 @@ def train_model(fusion_type, strategy='concat', attention=None ,transfer_learnin
 
         train_dataloader, val_dataloader, N, M = data_utils.get_data(fusion_type)
 
-        model = utils.load_model(fusion_type, N, M, strategy, transfer_learning)  # No weights needed for training
+        model = utils.load_model(fusion_type, N, M, strategy=strategy, attention=attention, transfer_learning=transfer_learning)  
 
-        model.compile(optim, total_loss, 
-                    metrics=[keras.metrics.BinaryIoU(target_class_ids=[1], threshold=0.5)])
+        model.compile(config.optim, config.total_loss, 
+                      metrics = [
+                            keras.metrics.BinaryIoU(target_class_ids=[1], threshold=0.5),
+                            utils.f_score  ])
+            #        metrics=[keras.metrics.BinaryIoU(target_class_ids=[1], threshold=0.5)])
             #metrics=[sm.metrics.iou_score, sm.metrics.f1_score, sm.metrics.precision, sm.metrics.recall])
         
         callbacks = [
             # keras.callbacks.ModelCheckpoint('best_'+fusion_type+strategy+str(transfer_learning)+ '.weights.h5', save_weights_only=True, save_best_only=True, mode='min'),
-            keras.callbacks.ModelCheckpoint(f'best_{fusion_type}{strategy}{transfer_learning}.weights.h5', save_weights_only=True, save_best_only=True, monitor='val_binary_io_u', mode='max'),
-            keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=6, verbose=1, min_lr=5e-5),   
+            keras.callbacks.ModelCheckpoint(f'best_{fusion_type}{strategy}{attention}.weights.h5', save_weights_only=True, save_best_only=True, monitor='val_binary_io_u', mode='max'),
+            keras.callbacks.ReduceLROnPlateau(monitor='val_binary_io_u', factor=0.5, patience=6, verbose=1, min_lr=5e-5),   
             keras.callbacks.EarlyStopping(monitor='val_binary_io_u', patience=10),
             WandbMetricsLogger(),
             ]
@@ -125,6 +127,7 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
+    print("Transfer learning flag:", args.transfer_learning)
 
 
     best_acc = train_model(args.fusion, strategy=args.strategy, attention=args.attention, transfer_learning=args.transfer_learning)
