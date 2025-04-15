@@ -61,7 +61,7 @@ def get_data(fusion_type):
                 images_dir1=config.S1_train_dir,  
                 images_dir2=config.S2_train_dir,  
                 masks_dir=config.y_train_dir,  
-                dem_dir=config.DEM_train, 
+              #  dem_dir=config.DEM_train, 
                 classes=['rts'],  
                augmentation=utils.get_training_augmentation(),  
                 preprocessing=utils.get_preprocessing(preprocess_input),  
@@ -72,7 +72,7 @@ def get_data(fusion_type):
                 images_dir1=config.S1_valid_dir,  
                 images_dir2=config.S2_valid_dir,  
                 masks_dir=config.y_valid_dir,  
-                dem_dir=config.DEM_val,
+              #  dem_dir=config.DEM_val,
                 classes=['rts'],
                 augmentation=None,  # No augmentation for validation
                 preprocessing=utils.get_preprocessing(preprocess_input), 
@@ -87,18 +87,9 @@ def get_data(fusion_type):
             M = images1.shape[-1]  
             N = images2.shape[-1]  
 
-            print(train_dataloader[0][0][0].shape)
-            print(BATCH_SIZE, 256, 256, M)
-
-            print(train_dataloader[0][0][1].shape)
-            print(BATCH_SIZE, 256, 256, N)
-
-            assert train_dataloader[0][0][0].shape == (BATCH_SIZE, 256, 256, M)
-            assert train_dataloader[0][0][1].shape == (BATCH_SIZE, 256, 256, N)
-            #assert train_dataloader[0][1][0].shape == (BATCH_SIZE, 256, 256, 1) WHYY?????
-
-            print(train_dataloader[0][1][0].shape)
-
+            assert train_dataloader[0][0][0].shape == (BATCH_SIZE, 256, 256, M) # image1 shape
+            assert train_dataloader[0][0][1].shape == (BATCH_SIZE, 256, 256, N) # image2 shape
+            assert train_dataloader[0][1].shape == (BATCH_SIZE, 256, 256, 1)    # mask shape 
 
         return train_dataloader, valid_dataloader, N, M
 '''
@@ -391,28 +382,42 @@ class Dataloder(keras.utils.Sequence):
             self.indexes = np.random.permutation(self.indexes)   
 
 class FusionDataset(Dataset):
-    def __init__(self, images_dir1, images_dir2, masks_dir, dem_dir,classes=None, augmentation=None, preprocessing=None, ndvi=False, ):
+    def __init__(
+        self,
+        images_dir1,
+        images_dir2,
+        masks_dir,
+        dem_dir=None,
+        classes=None,
+        augmentation=None,
+        preprocessing=None,
+        ndvi=False,
+    ):
         super().__init__(images_dir1, masks_dir, classes, augmentation, preprocessing)
         self.images_fps2 = [os.path.join(images_dir2, image_id) for image_id in self.ids]
         self.ndvi = ndvi
-        self.dem_fps = [os.path.join(dem_dir, image_id) for image_id in self.ids]  
+        self.dem_dir = dem_dir
+        if self.dem_dir is not None:
+            self.dem_fps = [os.path.join(dem_dir, image_id) for image_id in self.ids]  
+
+    def __getitem__(self, i):
+        
+        image1 = read_tif(self.images_fps[i]).astype(np.float32)
+
+        if self.dem_dir is not None:
+            dem_data = read_tif(self.dem_fps[i], as_gray=False).astype(np.float32)  
+            #dem_data = dem_data[..., np.newaxis]  # CHANGE
+            image1 = np.concatenate((image1, dem_data), axis=-1)
 
     
-    def __getitem__(self, i):
-        image1 = read_tif(self.images_fps[i]).astype(np.float32)
-        dem_data = read_tif(self.dem_fps[i], as_gray=True).astype(np.float32) # CHANGE
-        dem_data = dem_data[..., np.newaxis]  # CHANGE
-        image1 = np.concatenate((image1, dem_data), axis=-1)
-
-        image3 = read_tif(self.images_fps2[i], bands=[3,9]).astype(np.float32) # CHANGE
-        image2 = read_tif(self.images_fps2[i]).astype(np.float32) # CHANGE
+        image2 = read_tif(self.images_fps2[i]).astype(np.float32)  
 
         if self.ndvi:
             red_band = image2[:, :, 2]
             nir_band = image2[:, :, 6]
             ndvi = calculate_ndvi(nir_band, red_band)
             ndvi = np.expand_dims(ndvi, axis=2)
-            image2 = np.concatenate((image3, ndvi), axis=-1)     # CHANGE
+            image2 = np.concatenate((image2, ndvi), axis=-1)  
         
         mask = read_tif(self.masks_fps[i], as_gray=True)
         mask_array = np.array(mask)
@@ -424,7 +429,6 @@ class FusionDataset(Dataset):
         if self.augmentation:
             sample = self.augmentation(image=image1, image2=image2, mask=mask)
             image1, image2, mask = sample['image'], sample['image2'], sample['mask']
-
         
         if self.preprocessing:
             sample = self.preprocessing(image=image1, mask=mask)
@@ -467,7 +471,44 @@ class FusionDataloder(Dataloder):
         # Convert lists to numpy arrays
         images1 = np.array(images1)
         images2 = np.array(images2)
-        masks = np.array(masks)
+        masks = np.stack(masks, axis=0)
+        
+        return (images1, images2), masks
+
+ 
+    
+class FusionDataloder(Dataloder):
+    """Loads data from FusionDataset and forms batches for middle fusion.
+    
+    Inherits:
+        Dataloder: Base data loader class.
+
+    Args:
+        dataset: Instance of FusionDataset for loading and preprocessing images.
+        batch_size: Integer, number of images per batch.
+        shuffle: Boolean, if True, shuffles indexes each epoch.
+    """
+    def __init__(self, dataset, batch_size=1, shuffle=False, **kwargs):
+        # Initialize parent class Dataloder
+        super().__init__(dataset, batch_size=batch_size, shuffle=shuffle, **kwargs)
+    
+    def __getitem__(self, index):
+        # Collect batch data
+        start = index * self.batch_size
+        stop = (index + 1) * self.batch_size
+        data = [self.dataset[i] for i in self.indexes[start:stop]]
+        
+        images1, images2, masks = [], [], []
+        
+        for (image1, image2), mask in data:
+            images1.append(image1)
+            images2.append(image2)
+            masks.append(mask)
+        
+        # Convert lists to numpy arrays
+        images1 = np.array(images1)
+        images2 = np.array(images2)
+        masks = np.stack(masks, axis=0)
         
         return (images1, images2), masks
 

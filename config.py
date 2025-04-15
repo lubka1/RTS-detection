@@ -12,7 +12,7 @@ import segmentation_models as sm
 
 
 # Environment setting
-DATA_DIR = r"C:\Users\smola\Documents\MASTER\TRY_Dataset"
+DATA_DIR = r"C:\Users\smola\Documents\MASTER\SEN12"
 
 S1_train_dir = os.path.join(DATA_DIR, 'train', 'S1')
 S1_valid_dir = os.path.join(DATA_DIR, 'val', 'S1')
