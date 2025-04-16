@@ -14,7 +14,7 @@ Permafrost degradation is a critical issue in Arctic environments, and RTS detec
 
 ## Credits
 
-This project is adapted from [qubvel/segmentation_models](https://github.com/qubvel/segmentation_models), with modifications to support early, middle, and late fusion strategies, attention mechanisms, and custom training pipelines.
+This project is adapted from [qubvel/segmentation_models](https://github.com/qubvel/segmentation_models), licensed under the MIT License, with modifications to support early, middle, and late fusion strategies, attention mechanisms, and custom training pipelines.  qubvel/segmentation_models, licensed under the MIT License.
 
 
 
