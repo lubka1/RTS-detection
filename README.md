@@ -12,6 +12,10 @@ Permafrost degradation is a critical issue in Arctic environments, and RTS detec
 - **Fusion**: Early, Middle and Late data fusion 
 - **Framework**: Keras
 
+## Credits
+
+This project is adapted from [qubvel/segmentation_models](https://github.com/qubvel/segmentation_models), with modifications to support early, middle, and late fusion strategies, attention mechanisms, and custom training pipelines.
+
 
 
 
