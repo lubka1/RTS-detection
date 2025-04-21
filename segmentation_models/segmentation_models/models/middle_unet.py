@@ -175,8 +175,8 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
         keras.models.Model instance
 
     """
-    print('input_shape1 ',input_shape1)
-    print('input_shape2 ',input_shape2)
+    print('input_shape1 in middle ',input_shape1)
+    print('input_shape2 in middle ',input_shape2)
     backbone1 = get_backbone(backbone_name1,
                             input_shape=input_shape1,
                             input_tensor=input_tensor,

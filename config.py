@@ -1,18 +1,23 @@
 import os
 
-
+# Environment variables must be set before importing tensorflow or segmentation_models, otherwise, they won’t take effect.
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ["SM_FRAMEWORK"] = "tf.keras"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0" # oneDNN can introduce floating-point variability, turn it off
-# Environment variables must be set before importing tensorflow or segmentation_models, otherwise, they won’t take effect.
 
+import tensorflow as tf
 import tensorflow.keras as keras
 import segmentation_models as sm
+import numpy as np
+import random
 
-
+SEED = 42  
+np.random.seed(SEED)# Set seed for NumPy
+random.seed(SEED)# Set seed for Python random
+tf.random.set_seed(sSEED)# Set seed for TensorFlow (and Keras)
 
 # Environment setting
-DATA_DIR = r"C:\Users\smola\Documents\MASTER\SEN12"
+DATA_DIR = r"C:\Users\smola\Documents\MASTER\TRY_Dataset"
 
 S1_train_dir = os.path.join(DATA_DIR, 'train', 'S1')
 S1_valid_dir = os.path.join(DATA_DIR, 'val', 'S1')

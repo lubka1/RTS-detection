@@ -1,12 +1,12 @@
-import config  # Import settings from config.py
+import config  
 import utils
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import rasterio
 import segmentation_models as sm
 import tensorflow.keras as keras
-
 
 BACKBONE = config.BACKBONE
 BATCH_SIZE = config.BATCH_SIZE
@@ -55,7 +55,7 @@ def get_data(fusion_type):
             assert train_dataloader[0][0].shape == (BATCH_SIZE, 256, 256, N)
             assert train_dataloader[0][1].shape == (BATCH_SIZE, 256, 256, 1)
             
-        elif fusion_type == 'middle' or 'late':
+        elif fusion_type in ['middle', 'late']:
 
             train_dataset = FusionDataset(
                 images_dir1=config.S1_train_dir,  
@@ -204,8 +204,7 @@ class Dataset:
             assert images_dir2 is not None, "When fusion is enabled, images_dir2 must be provided."
             self.images_fps2 = [os.path.join(images_dir2, image_id) for image_id in self.ids]
         
-        # convert str names to class values on masks
-        self.class_values = [self.CLASSES.index(cls.lower()) for cls in classes] # check if I shouldnt remove this?
+        self.class_values = [self.CLASSES.index(cls.lower()) for cls in classes] 
         
         self.augmentation = augmentation
         self.preprocessing = preprocessing
@@ -227,16 +226,15 @@ class Dataset:
             nir_band = image1[:, :, 7]  # Band 8
             ndvi = calculate_ndvi(nir_band, red_band)
             ndvi = np.expand_dims(ndvi, axis=2)  # Expand dims to add as a channel
-            #print(red_band.shape,ndvi.shape)
             image = np.concatenate((image, ndvi), axis=-1)    
 
         mask = read_tif(self.masks_fps[i], as_gray=True)
         mask_array = np.array(mask)
         mask = (mask_array / 250).astype(np.float32)
-        #masks = [(mask == v) for v in self.class_values]
-        masks = [(~(mask == v)) for v in self.class_values]  # Inverting the boolean mask
+        masks = [(mask == v) for v in self.class_values]
+        #masks = [(~(mask == v)) for v in self.class_values]  # Inverting the boolean mask
         mask = np.stack(masks, axis=-1).astype('float')
-        print(f"final mask shape: {mask.shape}")  # Add this line
+        #print(f"final mask shape: {mask.shape}")  
         
         # apply augmentations
         if self.augmentation:
@@ -294,13 +292,11 @@ class EarlyDataset:
         self.preprocessing = preprocessing
         
     def __getitem__(self, i):
- # takze tuto citam uz normalized image, asi uz nepotrebujem to dat na float
         # Read Sentinel-1 image (assumed to be float32 after normalization)
         s1_image = read_tif(self.s1_fps[i]).astype(np.float32) 
         # add slope and elevation
         dem_data = read_tif(self.dem_fps[i]).astype(np.float32)
         s1_image = np.concatenate((s1_image, dem_data), axis=-1)
-
 
         s2_image = read_tif(self.s2_fps[i]).astype(np.float32)
 
@@ -401,7 +397,7 @@ class FusionDataset(Dataset):
             self.dem_fps = [os.path.join(dem_dir, image_id) for image_id in self.ids]  
 
     def __getitem__(self, i):
-        
+
         image1 = read_tif(self.images_fps[i]).astype(np.float32)
 
         if self.dem_dir is not None:
@@ -433,10 +429,9 @@ class FusionDataset(Dataset):
         if self.preprocessing:
             sample = self.preprocessing(image=image1, mask=mask)
             image1, mask = sample['image'], sample['mask']
-            sample = self.preprocessing(image=image2, mask=mask)
-            image2, _ = sample['image'], sample['mask']
+            sample2 = self.preprocessing(image=image2)
+            image2 = sample2['image']
         
-        #return {"input_1": image1, "input_2": image2}, mask
         return (image1, image2), mask
  
     

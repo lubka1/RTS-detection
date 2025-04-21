@@ -1,15 +1,23 @@
-import config  # Import settings from config.py
+"""
+utils.py
 
-import os
+Utility functions and classes for model construction, training, evaluation,
+and data augmentation for semantic segmentation tasks.
+"""
+
+import config  
+import fusion
+
 import numpy as np
 import matplotlib.pyplot as plt
-import rasterio
 import albumentations as A
 import tensorflow.keras as keras
 import segmentation_models as sm
 import tensorflow as tf
 from tensorflow.keras import layers, Model, Input
-import fusion
+import logging
+logging.basicConfig(level=logging.INFO)
+
 
 BACKBONE = config.BACKBONE
 BATCH_SIZE = config.BATCH_SIZE
@@ -21,24 +29,49 @@ preprocess_input = sm.get_preprocessing(BACKBONE)
 
 def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_learning=False, model_path=None):
     """
-    Loads the correct model architecture and applies saved weights if provided.
-    """
-    print("[DEBUG] transfer_learning received in load_model:", transfer_learning)
+    Load and return a segmentation model based on fusion type and other settings.
 
+    Args:
+        fusion_type (str): 'early', 'middle', or 'late' fusion model type.
+        N (int): Number of input channels for input2.
+        M (int): Number of input channels for input1.
+        strategy (str): Fusion strategy for late fusion ('concat', 'average'). 
+        attention (str, optional): Attention mechanism to use ('grid', 'channel').
+        transfer_learning (bool): Whether to use pretrained ImageNet weights.
+        model_path (str, optional): Path to load saved weights.
+
+    Returns:
+        keras.Model: Constructed and optionally preloaded model.
+    """
+     
     encoder_weights = None  # default
 
     if transfer_learning:
         encoder_weights = 'imagenet'
-        print("Using Imagenet pre-trained weights")
+        logging.info("Using Imagenet pre-trained weights")
     
     if fusion_type == 'early':
-        model = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
+        model = sm.Unet(
+            BACKBONE,
+            encoder_weights=encoder_weights,
+            classes=1,
+            activation=config.activation,
+            input_shape=(None, None, N)
+        )
     elif fusion_type == 'middle':
-        model = sm.MiddleUnet('midresnet50', 'resnet50', encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape1=(None, None, M), input_shape2=(None, None, N))
+        model = sm.MiddleUnet(
+            'midresnet50',
+            'resnet50',
+            encoder_weights=encoder_weights,
+            classes=1,
+            activation=config.activation,
+            input_shape1=(None, None, M),
+            input_shape2=(None, None, N)
+        )
     elif fusion_type == 'late':
-        model = construct_late_unet(M,N, strategy, attention=attention, encoder_weights=encoder_weights)
+        model = construct_late_unet(M, N, strategy, attention, encoder_weights)
     else:
-        raise Exception("Model type not recognized.")
+        raise ValueError("Fusion type not recognized.")
     
     '''
     # Get the first convolutional layer
@@ -59,33 +92,31 @@ def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_lea
 
     return model
 
+
 def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights=None):
     """
-    Constructs a Late Fusion U-Net model with various fusion options.
-    
-    Parameters:
-    - M: Number of channels for input1
-    - N: Number of channels for input2
-    - fusion_type: Fusion strategy ('attention', 'channel', 'concat')
-    - mode: Fusion mode ('average', 'residual', 'concat')
-    
+    Construct a U-Net model using a late fusion strategy.
+
+    Args:
+        M (int): Number of input channels for first input.
+        N (int): Number of input channels for second input.
+        strategy (str): Fusion strategy ('concat', 'average').
+        attention (str, optional): Attention mechanism ('grid' or 'channel').
+        encoder_weights (str, optional): Encoder weights ('imagenet' or None).
+
     Returns:
-    - Compiled Keras Model
+        keras.Model: A compiled Keras model with late fusion.
     """
-    print("[DEBUG] transfer_learning received in construct late unet:", encoder_weights)
 
     model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M), late_fusion=True, input_shape2=(None, None, N))   # S1
     model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N), late_fusion=True, input_shape2=(None, None, M))   # S2
     
-    # Input layers
     input1 = Input(shape=(None, None, M))  # S1
     input2 = Input(shape=(None, None, N))  # S2
 
-    # Extract feature maps
     features1 = model1(input1)  
     features2 = model2(input2)
 
-        # Optional Attention
     if attention == 'grid': 
         attention_layer = fusion.GridAttention() # GridAttention is a cross-attention mechanism — it takes two inputs
         features1 = attention_layer(features1, features2)
@@ -98,15 +129,14 @@ def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights
         features2 = channel_gate2(features2)
 
     x = [features1, features2]
-
     if strategy == 'concat':
         fusion_output = layers.Concatenate(axis=-1, name="concat_features")(x)
     elif strategy == 'average':
         fusion_output = fusion.WeightedAverage(n_output=len(x))(x)
 
-    # Apply final convolution layer
+    # final convolution layer
     output = layers.Conv2D(
-        filters=1,  # Number of output classes (e.g., binary segmentation)
+        filters=1,  # Number of output classes 
         kernel_size=(3, 3),
         padding='same',
         use_bias=True,
@@ -116,26 +146,17 @@ def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights
 
     output = layers.Activation(config.activation)(output)
 
-    # Define and compile model
-    model = Model(inputs=[input1, input2], outputs=output)
-
-    return model
+    return Model(inputs=[input1, input2], outputs=output)
 
 
-# for plotting training and validation
-# maybe i wont need it when i use wandb
 def plot_history(history):
     """
-    Plot training and validation metrics from the history object.
+    Plot training and validation metrics from a training history.
 
-    Parameters:
-    history: keras.callbacks.History
-        The history object returned by model.fit(), containing training and validation metrics.
+    Args:
+        history (keras.callbacks.History): The history object from model.fit().
 
-    Returns:
-    None
     """
-    # Print available metrics
     #print("Available metrics in history:", history.history.keys())
     
     # Extract metric names
@@ -145,10 +166,8 @@ def plot_history(history):
     val_metric_1 = list(history.history.keys())[2]  # Validation for the first metric
     val_metric_2 = list(history.history.keys())[3]  # Validation for the second metric
     
-    # Plot training and validation metrics
     plt.figure(figsize=(30, 5))
     
-    # Subplot 1: First metric (binary iou)
     plt.subplot(121)
     plt.plot(history.history[metric_1])
     plt.plot(history.history[val_metric_1])
@@ -157,7 +176,6 @@ def plot_history(history):
     plt.xlabel('Epoch')
     plt.legend(['Train', 'Validation'], loc='upper left')
     
-    # Subplot 2: Second metric (loss)
     plt.subplot(122)
     plt.plot(history.history[metric_2])
     plt.plot(history.history[val_metric_2])
@@ -166,10 +184,19 @@ def plot_history(history):
     plt.xlabel('Epoch')
     plt.legend(['Train', 'Validation'], loc='upper left')
     
-    # Show the plots
     plt.show()
 
 def f_score(y_true, y_pred):
+    """
+    Compute the F1 score.
+
+    Args:
+        y_true (tf.Tensor): Ground truth binary labels.
+        y_pred (tf.Tensor): Predicted binary labels.
+
+    Returns:
+        tf.Tensor: Computed F1 score.
+    """
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
     tp = tf.reduce_sum(y_true * y_pred)
@@ -177,39 +204,55 @@ def f_score(y_true, y_pred):
     fn = tf.reduce_sum(y_true * (1 - y_pred))
     return tp / (tp + 0.5 * (fp + fn))
 
+
 # AUGMENTATION            
 
 def round_clip_0_1(x, **kwargs):
     return x.round().clip(0, 1)
 
 train_transform = [
-        A.HorizontalFlip(p=0.5),  # Randomly flip images horizontally
-        A.VerticalFlip(p=0.5),    # Randomly flip images vertically
-        A.RandomRotate90(p=0.5),   # Randomly rotate images by multiples of 90°
-        A.Blur(blur_limit=3, p=0.5),  # Randomly blur images
+        A.HorizontalFlip(p=0.5),        # Randomly flip images horizontally
+        A.VerticalFlip(p=0.5),          # Randomly flip images vertically
+        A.RandomRotate90(p=0.5),        # Randomly rotate images by multiples of 90°
+        A.Blur(blur_limit=3, p=0.5),    # Randomly blur images
     ]
 
 def get_training_augmentation(train_transform=train_transform):
-    #   return A.Compose(train_transform)
+    """
+    Compose and return a training augmentation pipeline. Including a second image if provided by dataloader.
+
+    Args:
+        train_transform (list): List of Albumentations transforms.
+
+    Returns:
+        A.Compose: Albumentations pipeline.
+    """
     return A.Compose(train_transform, additional_targets={'image2': 'image'})
 
 def get_preprocessing(preprocessing_fn):
     """Construct preprocessing transform
     
     Args:
-        preprocessing_fn (callable): data normalization function 
-            (can be specific for each pretrained neural network)
+        preprocessing_fn (callable): Preprocessing function for a given model backbone.
+
     Return:
         transform: albumentations.Compose
     
     """
-    
     _transform = [
         A.Lambda(image=preprocessing_fn),
     ]
     return A.Compose(_transform)
 
 class RandomChoice(A.BasicTransform):
+    """
+    Apply one of several random transformations to the input.
+
+    Args:
+        transforms (list): List of Albumentations transforms to choose from.
+        always_apply (bool): Whether to always apply this transform.
+        p (float): Probability of applying the transformation.
+    """
     def __init__(self, transforms, always_apply=False, p=1.0):
         super().__init__(always_apply, p)
         self.transforms = transforms

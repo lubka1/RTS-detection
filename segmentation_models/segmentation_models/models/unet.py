@@ -275,8 +275,8 @@ def Unet(
         https://arxiv.org/pdf/1505.04597
 
     """
-    print('input_shape1 ',input_shape)
-    print('input_shape2 ',input_shape2)
+    print('input_shape1 in Unet model',input_shape)
+    print('input_shape2 in Unet model',input_shape2)
 
     global backend, layers, models, keras_utils
     submodule_args = filter_keras_submodules(kwargs)
