@@ -21,6 +21,10 @@ conda create -n rts-detection python=3.8
 conda activate rts-detection
 pip install -r requirements.txt
 ```
+Add dependencies:
+```bash
+conda install -c conda-forge gdal
+```
 
 ## Train Model
 
