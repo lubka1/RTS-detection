@@ -27,10 +27,21 @@ conda install -c conda-forge gdal
 ```
 
 ## Train Model
+To train the model, use the `train.py` script with a specified fusion mode:
 
+```bash
+python train.py --fusion early
+```
+- `--fusion` *(required)*  
+  Type: `str`  
+  Choices: `early`, `middle`, `late`  
+  **Description**: Selects the data fusion strategy used in the model architecture.
 
 
 ## Run Inference
+```bash
+python  predict.py
+```
 
 ## Credits
 
