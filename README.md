@@ -13,6 +13,17 @@ Permafrost degradation is a critical issue in Arctic environments, and RTS detec
 - **Framework**: Keras
 
 ## Project Structure
+```       
+
+├── src/                    # Source code
+│   ├── utils/      # Data loading, normalization, and formatting
+│   ├── training/           # Model architecture, training loop, and loss functions
+│   ├── inference/          # Prediction and visualization scripts
+│   └── fusion/             # Fusion techniques (early, middle, late)
+├── config.py               # Configuration file for paths and hyperparameters
+├── requirements.txt        # Python dependencies
+└── README.md               # Project documentation
+```
 
 ## Environment Setup (Conda)
 
