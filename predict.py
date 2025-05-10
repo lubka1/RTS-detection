@@ -12,10 +12,6 @@ from tensorflow.keras.preprocessing.image import save_img  # Optional: to save p
 # Preprocessing function (same as during training)
 preprocess_input = sm.get_preprocessing(config.BACKBONE)
 
-# this one was made by chatgpt mine was different?????
-def denormalize(image):
-    """Denormalize image if necessary (scaling back to [0, 255] range)."""
-    return image * 255.0
 
 def main(fusion_type, model_path, strategy='concat', n=None):
     """Loads a trained model and predicts on n images from the test set."""
