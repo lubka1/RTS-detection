@@ -1,8 +1,8 @@
 import os
 
-# Environment variables must be set before importing tensorflow or segmentation_models, otherwise, they won’t take effect.
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+# The backend must be configured before importing Keras, and the backend cannot be changed after the package has been imported. https://keras.io/getting_started/#configuring-your-backend
 os.environ["SM_FRAMEWORK"] = "tf.keras"
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0" # oneDNN can introduce floating-point variability, turn it off
 
 import tensorflow as tf
@@ -14,7 +14,7 @@ import random
 SEED = 42  
 np.random.seed(SEED)# Set seed for NumPy
 random.seed(SEED)# Set seed for Python random
-tf.random.set_seed(sSEED)# Set seed for TensorFlow (and Keras)
+tf.random.set_seed(SEED)# Set seed for TensorFlow (and Keras)
 
 # Environment setting
 DATA_DIR = r"C:\Users\smola\Documents\MASTER\TRY_Dataset"
@@ -41,7 +41,7 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 BACKBONE = 'resnet50' 
 BATCH_SIZE = 8
 LR = 0.0005 
-EPOCHS = 50
+EPOCHS = 2
 
 activation = 'sigmoid' 
 optim = keras.optimizers.Adam(LR)

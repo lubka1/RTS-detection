@@ -51,9 +51,10 @@ def get_data(fusion_type):
             valid_dataloader = Dataloder(val_dataset, batch_size=1, shuffle=False)
             print(train_dataloader[0][1].shape)
 
-            # check shapes for errors
-            assert train_dataloader[0][0].shape == (BATCH_SIZE, 256, 256, N)
-            assert train_dataloader[0][1].shape == (BATCH_SIZE, 256, 256, 1)
+            if train_dataloader[0][0].shape != (BATCH_SIZE, 256, 256, N):
+                raise ValueError(f"Input shape: {train_dataloader[0][0].shape}, expected: (BATCH_SIZE, 256, 256, {N})")
+            if train_dataloader[0][1].shape != (BATCH_SIZE, 256, 256, 1):
+                raise ValueError(f"Output shape: {train_dataloader[0][1].shape}, expected: (BATCH_SIZE, 256, 256, 1)")
             
         elif fusion_type in ['middle', 'late']:
 
@@ -87,9 +88,14 @@ def get_data(fusion_type):
             M = images1.shape[-1]  
             N = images2.shape[-1]  
 
-            assert train_dataloader[0][0][0].shape == (BATCH_SIZE, 256, 256, M) # image1 shape
-            assert train_dataloader[0][0][1].shape == (BATCH_SIZE, 256, 256, N) # image2 shape
-            assert train_dataloader[0][1].shape == (BATCH_SIZE, 256, 256, 1)    # mask shape 
+            if train_dataloader[0][0][0].shape != (BATCH_SIZE, 256, 256, M):
+                raise ValueError(f"Expected image1 shape {(BATCH_SIZE, 256, 256, M)}, but got {train_dataloader[0][0][0].shape}")
+
+            if train_dataloader[0][0][1].shape != (BATCH_SIZE, 256, 256, N):
+                raise ValueError(f"Expected image2 shape {(BATCH_SIZE, 256, 256, N)}, but got {train_dataloader[0][0][1].shape}")
+
+            if train_dataloader[0][1].shape != (BATCH_SIZE, 256, 256, 1):
+                raise ValueError(f"Expected mask shape {(BATCH_SIZE, 256, 256, 1)}, but got {train_dataloader[0][1].shape}")
 
         return train_dataloader, valid_dataloader, N, M
 '''
@@ -140,13 +146,12 @@ def read_tif(file_path, as_gray=False, normalize=True, bands=None):
         return data  
 
 def normalize_image(image):
-    """Normalize the image to the range [0, 1]."""
     image_min = image.min()
     image_max = image.max()
-    if image_min != image_max:
-        return (image - image_min) / (image_max - image_min)
+    if image_max - image_min == 0:
+        return np.zeros_like(image, dtype=np.float32)  # or np.ones_like(image)
     else:
-        return image-image_min
+        return (image - image_min) / (image_max - image_min)
 
 # helper function for data visualization    
 def denormalize(x):
@@ -201,7 +206,6 @@ class Dataset:
 
         self.fusion = fusion
         if self.fusion:
-            assert images_dir2 is not None, "When fusion is enabled, images_dir2 must be provided."
             self.images_fps2 = [os.path.join(images_dir2, image_id) for image_id in self.ids]
         
         self.class_values = [self.CLASSES.index(cls.lower()) for cls in classes] 

@@ -89,13 +89,12 @@ def train_model(fusion_type, strategy='concat', attention=None , transfer_learni
     
     # Train
     start_time = time.time()
+    print('Started training')
     history = model.fit(
         train_dataloader, 
-        steps_per_epoch=len(train_dataloader), 
         epochs=EPOCHS, 
         callbacks=callbacks, 
         validation_data=val_dataloader, 
-        validation_steps=len(val_dataloader), 
     )
     elapsed_time = time.time() - start_time
     print('Training complete. Elapsed time: '+str(elapsed_time))

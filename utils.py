@@ -7,6 +7,7 @@ and data augmentation for semantic segmentation tasks.
 
 import config  
 import fusion
+from custom_models.segmentation.middle_unet import MiddleUnet
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -58,8 +59,8 @@ def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_lea
             activation=config.activation,
             input_shape=(None, None, N)
         )
-    elif fusion_type == 'middle':
-        model = sm.MiddleUnet(
+    elif fusion_type == 'middle':   # chnage this function so that you use the same backbone but with different prefix
+        model = MiddleUnet(
             'midresnet50',
             'resnet50',
             encoder_weights=encoder_weights,
@@ -108,14 +109,22 @@ def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights
         keras.Model: A compiled Keras model with late fusion.
     """
 
-    model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M), late_fusion=True, input_shape2=(None, None, N))   # S1
-    model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N), late_fusion=True, input_shape2=(None, None, M))   # S2
-    
+    #model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M), late_fusion=True, input_shape2=(None, None, N))   # S1
+    #model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N), late_fusion=True, input_shape2=(None, None, M))   # S2
+    model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M))
+    model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
+
     input1 = Input(shape=(None, None, M))  # S1
     input2 = Input(shape=(None, None, N))  # S2
 
-    features1 = model1(input1)  
-    features2 = model2(input2)
+    # Truncate the models to second-to-last layer
+    model1_truncated = Model(inputs=model1.input, outputs=model1.layers[-2].output)  
+    model2_truncated = Model(inputs=model2.input, outputs=model2.layers[-2].output)  
+
+    # Get features from the truncated models
+    features1 = model1_truncated(input1)
+    features2 = model2_truncated(input2)
+
 
     if attention == 'grid': 
         attention_layer = fusion.GridAttention() # GridAttention is a cross-attention mechanism — it takes two inputs
