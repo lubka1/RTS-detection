@@ -25,34 +25,25 @@ def get_input_shape(input_shape=None):
     return input_shape
 
 def mid_build_resnet(
-     repetitions=(2, 2, 2, 2),
-     include_top=True,
-     input_tensor=None,
-     input_shape=None,
-     classes=1000,
-     block_type='usual'):
-    
-    """
-    TODO
-    
-    
-    # Determine proper input shape
-    input_shape = _obtain_input_shape(input_shape,
-                                      default_size=224,
-                                      min_size=197,
-                                      data_format='channels_last',
-                                      require_flatten=include_top)
-"""
+    repetitions=(2, 2, 2, 2),
+    include_top=True,
+    input_tensor=None,
+    input_shape=None,
+    classes=1000,
+    block_type='usual',
+    name_prefix='mid'  # here we will have two different prefexies
+):
+
     input_shape = get_input_shape(input_shape)
 
     if input_tensor is None:
-        img_input = Input(shape=input_shape, name='mid_data')
+        img_input = Input(shape=input_shape, name=f'{name_prefix}_data')
     else:
         if not K.is_keras_tensor(input_tensor):
             img_input = Input(tensor=input_tensor, shape=input_shape)
         else:
             img_input = input_tensor
-    
+
     # get parameters for model layers
     no_scale_bn_params = get_bn_params(scale=False)
     bn_params = get_bn_params()
@@ -65,49 +56,39 @@ def mid_build_resnet(
     else:
         conv_block = usual_conv_block
         identity_block = usual_identity_block
-    
+
     # resnet bottom
-    x = BatchNormalization(name='mid_bn_data', **no_scale_bn_params)(img_input)
+    x = BatchNormalization(name=f'{name_prefix}_bn_data', **no_scale_bn_params)(img_input)
     x = ZeroPadding2D(padding=(3, 3))(x)
-    x = Conv2D(init_filters, (7, 7), strides=(2, 2), name='mid_conv0', **conv_params)(x)
-    x = BatchNormalization(name='mid_bn0', **bn_params)(x)
-    x = Activation('relu', name='mid_relu0')(x)
+    x = Conv2D(init_filters, (7, 7), strides=(2, 2), name=f'{name_prefix}_conv0', **conv_params)(x)
+    x = BatchNormalization(name=f'{name_prefix}_bn0', **bn_params)(x)
+    x = Activation('relu', name=f'{name_prefix}_relu0')(x)
     x = ZeroPadding2D(padding=(1, 1))(x)
-    x = MaxPooling2D((3, 3), strides=(2, 2), padding='valid', name='mid_pooling0')(x)
-    
+    x = MaxPooling2D((3, 3), strides=(2, 2), padding='valid', name=f'{name_prefix}_pooling0')(x)
+
     # resnet body
     for stage, rep in enumerate(repetitions):
         for block in range(rep):
-            
-            filters = init_filters * (2**stage)
-            
-            # first block of first stage without strides because we have maxpooling before
+            filters = init_filters * (2 ** stage)
+
             if block == 0 and stage == 0:
-                x = conv_block(filters, stage, block, strides=(1, 1))(x)
-                
+                x = conv_block(filters, stage, block,name_prefix, strides=(1, 1))(x)
             elif block == 0:
-                x = conv_block(filters, stage, block, strides=(2, 2))(x)
-                
+                x = conv_block(filters, stage, block,name_prefix, strides=(2, 2))(x)
             else:
-                x = identity_block(filters, stage, block)(x)
-                
-    x = BatchNormalization(name='mid_bn1', **bn_params)(x)
-    x = Activation('relu', name='mid_relu1')(x)
+                x = identity_block(filters, stage, block, name_prefix)(x)  # add prefix here, but which block am i using? for resnet 34  basic
+
+    x = BatchNormalization(name=f'{name_prefix}_bn1', **bn_params)(x)
+    x = Activation('relu', name=f'{name_prefix}_relu1')(x)
 
     # resnet top
     if include_top:
-        x = GlobalAveragePooling2D(name='mid_pool1')(x)
-        x = Dense(classes, name='mid_fc1')(x)
-        x = Activation('softmax', name='mid_softmax')(x)
+        x = GlobalAveragePooling2D(name=f'{name_prefix}_pool1')(x)
+        x = Dense(classes, name=f'{name_prefix}_fc1')(x)
+        x = Activation('softmax', name=f'{name_prefix}_softmax')(x)
 
-    # Ensure that the model takes into account any potential predecessors of `input_tensor`.
-    if input_tensor is not None:
-        inputs = get_source_inputs(input_tensor)
-    else:
-        inputs = img_input
-        
-    # Create model.
+    # finalize model
+    inputs = get_source_inputs(input_tensor) if input_tensor is not None else img_input
     model = Model(inputs, x)
 
     return model
-

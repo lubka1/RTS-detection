@@ -1,3 +1,5 @@
+# https://github.com/MrGiovanni/UNetPlusPlus/tree/master/keras/segmentation_models/unet
+
 from keras.layers import Conv2DTranspose
 from keras.layers import UpSampling2D
 from keras.layers import Conv2D
@@ -15,6 +17,7 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
+# toto by tu nemalo byt? importuj, vlastne nie je tu name_base?
 def handle_block_names(stage):
     conv_name = 'decoder_stage{}_conv'.format(stage)
     bn_name = 'decoder_stage{}_bn'.format(stage)
@@ -119,25 +122,16 @@ def build_unet(backbone, classes, skip_connection_layers,
 '''
 
 DEFAULT_SKIP_CONNECTIONS = {
-    'vgg16':            ('block5_conv3', 'block4_conv3', 'block3_conv3', 'block2_conv2', 'block1_conv2'),
-    'vgg19':            ('block5_conv4', 'block4_conv4', 'block3_conv4', 'block2_conv2', 'block1_conv2'),
+ 
     'resnet18':         ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'), # check 'bn_data'
     'resnet34':         ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
-    'resnet50':         ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
+
+    'resnet50':         ('one_stage4_unit1_relu1', 'one_stage3_unit1_relu1', 'one_stage2_unit1_relu1', 'one_relu0'), # this has to match
     'midresnet50':         ('mid_stage4_unit1_relu1', 'mid_stage3_unit1_relu1', 'mid_stage2_unit1_relu1', 'mid_relu0'),
-    'resnet101':        ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
-    'resnet152':        ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
-    'resnext50':        ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
-    'resnext101':       ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
-    'inceptionv3':          (228, 86, 16, 9),
-    'inceptionresnetv2':    (594, 260, 16, 9),
-    'densenet121':          (311, 139, 51, 4),
-    'densenet169':          (367, 139, 51, 4),
-    'densenet201':          (479, 139, 51, 4),
 }
 
 
-def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
+def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16', # ked toto volam tak sem dosadim co? 
          input_shape1=(None, None, 2), input_shape2=(None, None, 11),
          input_tensor=None,
          encoder_weights='imagenet',
@@ -184,7 +178,7 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
                             include_top=False)
 
     
-    backbone2 = get_backbone(backbone_name2,   # has to be MidResNet50
+    backbone2 = get_backbone(backbone_name2,   # has to be MidResNet50 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                             input_shape=input_shape2,
                             input_tensor=input_tensor,
                             weights=encoder_weights,
@@ -283,18 +277,14 @@ def get_layer_number(model, layer_name):
     raise ValueError('No layer with name {} in  model {}.'.format(layer_name, model.name))
 
 
-from custom_classification_models.classification_models import MidResNet50, ResNet50 #ResNet18, ResNet34, ResNet101, ResNet152
-#from .classification_models.classification_models import ResNeXt50, ResNeXt101
+from custom_models.classification.models import MidResNet50, ResNet50 
 
 
 backbones = {
-  #  "resnet18": ResNet18,
+
     "resnet50": ResNet50,
     "midresnet50": MidResNet50,
-  #  "resnet101": ResNet101,
-  #  "resnet152": ResNet152,
-    #"resnext50": ResNeXt50,
-   # "resnext101": ResNeXt101,
+
 
 }
 def get_backbone(name, *args, **kwargs):

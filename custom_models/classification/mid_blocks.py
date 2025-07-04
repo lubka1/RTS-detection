@@ -7,9 +7,16 @@ from keras.layers import ZeroPadding2D
 from .params import get_conv_params
 from .params import get_bn_params
 
+# https://github.com/MrGiovanni/UNetPlusPlus/blob/master/keras/segmentation_models/backbones/classification_models/classification_models/resnet/blocks.py
 
-def handle_block_names(stage, block):
-    name_base = 'mid_stage{}_unit{}_'.format(stage + 1, block + 1)
+# to this function add the option of prefix??
+# prefox added
+# handle basic_identity_block for prefix
+# done
+# now call it with two differnt prefixes
+
+def handle_block_names(stage, block, prefix):
+    name_base = '{}_stage{}_unit{}_'.format(prefix, stage + 1, block + 1)
     conv_name = name_base + 'conv'
     bn_name = name_base + 'bn'
     relu_name = name_base + 'relu'
@@ -17,7 +24,7 @@ def handle_block_names(stage, block):
     return conv_name, bn_name, relu_name, sc_name
 
 
-def basic_identity_block(filters, stage, block):
+def basic_identity_block(filters, stage, block, prefix):
     """The identity block is the block that has no conv layer at shortcut.
     # Arguments
         kernel_size: default 3, the kernel size of
@@ -32,7 +39,7 @@ def basic_identity_block(filters, stage, block):
     def layer(input_tensor):
         conv_params = get_conv_params()
         bn_params = get_bn_params()
-        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block)
+        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block, prefix)
 
         x = BatchNormalization(name=bn_name + '1', **bn_params)(input_tensor)
         x = Activation('relu', name=relu_name + '1')(x)
@@ -50,7 +57,7 @@ def basic_identity_block(filters, stage, block):
     return layer
 
 
-def basic_conv_block(filters, stage, block, strides=(2, 2)):
+def basic_conv_block(filters, stage, block, prefix, strides=(2, 2)):
     """The identity block is the block that has no conv layer at shortcut.
     # Arguments
         input_tensor: input tensor
@@ -66,7 +73,7 @@ def basic_conv_block(filters, stage, block, strides=(2, 2)):
     def layer(input_tensor):
         conv_params = get_conv_params()
         bn_params = get_bn_params()
-        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block)
+        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block, prefix)
 
         x = BatchNormalization(name=bn_name + '1', **bn_params)(input_tensor)
         x = Activation('relu', name=relu_name + '1')(x)
@@ -86,7 +93,7 @@ def basic_conv_block(filters, stage, block, strides=(2, 2)):
     return layer
 
 
-def conv_block(filters, stage, block, strides=(2, 2)):
+def conv_block(filters, stage, block, prefix, strides=(2, 2)):
     """The identity block is the block that has no conv layer at shortcut.
     # Arguments
         input_tensor: input tensor
@@ -102,7 +109,7 @@ def conv_block(filters, stage, block, strides=(2, 2)):
     def layer(input_tensor):
         conv_params = get_conv_params()
         bn_params = get_bn_params()
-        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block)
+        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block, prefix)
 
         x = BatchNormalization(name=bn_name + '1', **bn_params)(input_tensor)
         x = Activation('relu', name=relu_name + '1')(x)
@@ -125,7 +132,7 @@ def conv_block(filters, stage, block, strides=(2, 2)):
     return layer
 
 
-def identity_block(filters, stage, block):
+def identity_block(filters, stage, block, prefix):
     """The identity block is the block that has no conv layer at shortcut.
     # Arguments
         kernel_size: default 3, the kernel size of
@@ -140,7 +147,7 @@ def identity_block(filters, stage, block):
     def layer(input_tensor):
         conv_params = get_conv_params()
         bn_params = get_bn_params()
-        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block)
+        conv_name, bn_name, relu_name, sc_name = handle_block_names(stage, block, prefix)
 
         x = BatchNormalization(name=bn_name + '1', **bn_params)(input_tensor)
         x = Activation('relu', name=relu_name + '1')(x)
