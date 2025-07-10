@@ -16,17 +16,17 @@ Permafrost degradation is a critical issue in Arctic environments, and RTS detec
 
 ```plaintext
 repo/
-├── data/ Dataset folder 
-├── custom_models/ Custom UNet model implementations
-├── train.py Training script
-├── predict.py Prediction script
-├── test.py Testing script
-├── data_utils.py Data helper functions
-├── fusion.py Fusions processing code
-├── utils.py Utility functions
-├── config.py Configuration settings
-├── requirements.txt Python dependencies
-└── README.md This file
+├── data/               Dataset folder 
+├── custom_models/      Custom UNet model implementations
+├── train.py            Training script
+├── predict.py          Prediction script
+├── test.py             Testing script
+├── data_utils.py       Data helper functions
+├── fusion.py           Fusions processing code
+├── utils.py            Utility functions
+├── config.py           Configuration settings
+├── requirements.txt 
+└── README.md 
  ```     
 
 
