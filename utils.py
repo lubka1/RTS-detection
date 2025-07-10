@@ -108,9 +108,6 @@ def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights
     Returns:
         keras.Model: A compiled Keras model with late fusion.
     """
-
-    #model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M), late_fusion=True, input_shape2=(None, None, N))   # S1
-    #model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N), late_fusion=True, input_shape2=(None, None, M))   # S2
     model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M))
     model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
 

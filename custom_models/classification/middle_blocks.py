@@ -9,11 +9,7 @@ from .params import get_bn_params
 
 # https://github.com/MrGiovanni/UNetPlusPlus/blob/master/keras/segmentation_models/backbones/classification_models/classification_models/resnet/blocks.py
 
-# to this function add the option of prefix??
-# prefox added
-# handle basic_identity_block for prefix
-# done
-# now call it with two differnt prefixes
+# added the option of prefix to all blocks
 
 def handle_block_names(stage, block, prefix):
     name_base = '{}_stage{}_unit{}_'.format(prefix, stage + 1, block + 1)

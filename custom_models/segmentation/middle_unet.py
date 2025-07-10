@@ -1,4 +1,5 @@
 # https://github.com/MrGiovanni/UNetPlusPlus/tree/master/keras/segmentation_models/unet
+# blocks, builder and model in one
 
 from keras.layers import Conv2DTranspose
 from keras.layers import UpSampling2D
@@ -15,9 +16,9 @@ from tensorflow.keras import layers
 
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))   #??????
 
-# toto by tu nemalo byt? importuj, vlastne nie je tu name_base?
+# blocks.py
 def handle_block_names(stage):
     conv_name = 'decoder_stage{}_conv'.format(stage)
     bn_name = 'decoder_stage{}_bn'.format(stage)
@@ -80,58 +81,19 @@ def Transpose2D_block(filters, stage, kernel_size=(3,3), upsample_rate=(2,2),
         return x
     return layer
 
-'''
-def build_unet(backbone, classes, skip_connection_layers,
-               decoder_filters=(256,128,64,32,16),
-               upsample_rates=(2,2,2,2,2),
-               n_upsample_blocks=5,
-               block_type='upsampling',
-               activation='sigmoid',
-               use_batchnorm=True):
 
-    input = backbone.input
-    x = backbone.output
-
-    if block_type == 'transpose':
-        up_block = Transpose2D_block
-    else:
-        up_block = Upsample2D_block
-
-    # convert layer names to indices
-    skip_connection_idx = ([get_layer_number(backbone, l) if isinstance(l, str) else l
-                               for l in skip_connection_layers])
-
-    for i in range(n_upsample_blocks):
-
-        # check if there is a skip connection
-        skip_connection = None
-        if i < len(skip_connection_idx):
-            skip_connection = backbone.layers[skip_connection_idx[i]].output
-
-        upsample_rate = to_tuple(upsample_rates[i])
-
-        x = up_block(decoder_filters[i], i, upsample_rate=upsample_rate,
-                     skip=skip_connection, use_batchnorm=use_batchnorm)(x)
-
-    x = Conv2D(classes, (3,3), padding='same', name='final_conv')(x)
-    x = Activation(activation, name=activation)(x)
-
-    model = Model(input, x)
-
-    return model
-'''
-
+# model.py
 DEFAULT_SKIP_CONNECTIONS = {
  
-    'resnet18':         ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'), # check 'bn_data'
+    'resnet18':         ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'), 
     'resnet34':         ('stage4_unit1_relu1', 'stage3_unit1_relu1', 'stage2_unit1_relu1', 'relu0'),
-
-    'resnet50':         ('one_stage4_unit1_relu1', 'one_stage3_unit1_relu1', 'one_stage2_unit1_relu1', 'one_relu0'), # this has to match
+# we are using resnet50
+    'resnet50':         ('one_stage4_unit1_relu1', 'one_stage3_unit1_relu1', 'one_stage2_unit1_relu1', 'one_relu0'), 
     'midresnet50':         ('mid_stage4_unit1_relu1', 'mid_stage3_unit1_relu1', 'mid_stage2_unit1_relu1', 'mid_relu0'),
 }
 
 
-def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16', # ked toto volam tak sem dosadim co? 
+def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16', 
          input_shape1=(None, None, 2), input_shape2=(None, None, 11),
          input_tensor=None,
          encoder_weights='imagenet',
@@ -178,8 +140,7 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16', # ked toto volam 
                             include_top=False)
 
     
-    backbone2 = get_backbone(backbone_name2,   # has to be MidResNet50 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                            input_shape=input_shape2,
+    backbone2 = get_backbone(backbone_name2,   
                             input_tensor=input_tensor,
                             weights=encoder_weights,
                             include_top=False)
@@ -191,7 +152,7 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16', # ked toto volam 
         skip_connections1 = skip_connections
         skip_connections2 = skip_connections
 
-    
+    # builder.py
     # Convert layer names to indices
     skip_connection_idx1 = [get_layer_number(backbone1, l) if isinstance(l, str) else l
                            for l in skip_connections1]
@@ -291,37 +252,3 @@ def get_backbone(name, *args, **kwargs):
     return backbones[name](*args, **kwargs)
 
 
-# FUSION
-
-class GridAttention(Model):
-    def __init__(self, inter_channels):
-        super(GridAttention, self).__init__()
-        self.inter_channels = inter_channels
-        
-        self.theta_x = layers.Conv2D(inter_channels, kernel_size=2, strides=2, padding='same')
-        self.upsample = layers.UpSampling2D(size=(2, 2))
-        self.phi_g = layers.Conv2D(inter_channels, kernel_size=1, strides=1, padding='same')
-        self.add = layers.Add()
-        self.relu = layers.Activation('relu')
-        self.attention_conv = layers.Conv2D(1, kernel_size=1)
-        self.sigmoid = layers.Activation('sigmoid')
-        self.multiply = layers.Multiply()
-    
-    def call(self, features, gating):
-        # Upsample features to match gating size
-        theta_x = self.theta_x(features)
-        theta_x = self.upsample(theta_x)
-        
-        # Apply phi_g
-        phi_g = self.phi_g(gating)
-        
-        # Add and apply attention
-        add = self.add([theta_x, phi_g])
-        attention_map = self.relu(add)
-        attention_map = self.attention_conv(attention_map)
-        attention_map = self.sigmoid(attention_map)
-        
-        # Apply attention to features
-        attention_weighted = self.multiply([features, attention_map])
-        
-        return attention_weighted

@@ -1,8 +1,8 @@
 #from ..utils import load_model_weights
 #from ..weights import weights_collection
-from .mid_builder import mid_build_resnet
+from .middle_builder import mid_build_resnet
 
-# these two functions call the same funcion
+# these two functions call the same funcion, redundant?
 
 def ResNet50(input_shape, input_tensor=None, weights=None, classes=1000, include_top=True):
     model = mid_build_resnet(input_tensor=input_tensor,
@@ -10,7 +10,7 @@ def ResNet50(input_shape, input_tensor=None, weights=None, classes=1000, include
                          repetitions=(3, 4, 6, 3),
                          classes=classes,
                          include_top=include_top,
-                         name_prefix='one')  # this cant be just anything... this has to match
+                         name_prefix='one')  
     model.name = 'resnet50'
     print('initialize resnet50')
 

@@ -13,10 +13,10 @@ from distutils.version import StrictVersion
 
 from .params import get_conv_params
 from .params import get_bn_params
-from .mid_blocks import basic_conv_block
-from .mid_blocks import basic_identity_block
-from .mid_blocks import conv_block as usual_conv_block
-from .mid_blocks import identity_block as usual_identity_block
+from .middle_blocks import basic_conv_block
+from .middle_blocks import basic_identity_block
+from .middle_blocks import conv_block as usual_conv_block
+from .middle_blocks import identity_block as usual_identity_block
 
 def get_input_shape(input_shape=None):
     if input_shape is None:
@@ -76,7 +76,7 @@ def mid_build_resnet(
             elif block == 0:
                 x = conv_block(filters, stage, block,name_prefix, strides=(2, 2))(x)
             else:
-                x = identity_block(filters, stage, block, name_prefix)(x)  # add prefix here, but which block am i using? for resnet 34  basic
+                x = identity_block(filters, stage, block, name_prefix)(x)  
 
     x = BatchNormalization(name=f'{name_prefix}_bn1', **bn_params)(x)
     x = Activation('relu', name=f'{name_prefix}_relu1')(x)
