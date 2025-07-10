@@ -17,7 +17,7 @@ random.seed(SEED)# Set seed for Python random
 tf.random.set_seed(SEED)# Set seed for TensorFlow (and Keras)
 
 # Environment setting
-DATA_DIR = r"C:\Users\smola\Documents\MASTER\TRY_Dataset"
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
 S1_train_dir = os.path.join(DATA_DIR, 'train', 'S1')
 S1_valid_dir = os.path.join(DATA_DIR, 'val', 'S1')
