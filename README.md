@@ -12,6 +12,21 @@ Permafrost degradation is a critical issue in Arctic environments, and RTS detec
 - **Fusion**: Early, Middle and Late data fusion 
 - **Framework**: Keras
 
+##  Repo Structure
+
+/data              # Dataset folder 
+/custom_models     # Custom UNet model implementations
+train.py           # Training script
+predict.py         # Prediction script
+test.py            # Testing script
+data_utils.py      # Data helper functions
+fusion.py          
+utils.py           # Utility functions
+config.py          # Configuration settings
+requirements.txt   # Python dependencies
+README.md          
+
+
 ## Credits
 
 This project is adapted from [qubvel/segmentation_models](https://github.com/qubvel/segmentation_models), licensed under the MIT License, with modifications to support early, middle, and late fusion strategies, attention mechanisms, and custom training pipelines.  qubvel/segmentation_models, licensed under the MIT License.
