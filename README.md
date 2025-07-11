@@ -33,6 +33,9 @@ repo/
 ## Environment Setup (Conda)
 
 ```bash
+git clone --branch overwrite https://github.com/lubka1/RTS-detection.git
+cd RTS-detection
+
 conda create -n rts-detection python=3.8
 conda activate rts-detection
 pip install -r requirements.txt
