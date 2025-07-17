@@ -41,7 +41,7 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 BACKBONE = 'resnet50' 
 BATCH_SIZE = 8
 LR = 0.0005 
-EPOCHS = 2
+EPOCHS = 50
 
 activation = 'sigmoid' 
 optim = keras.optimizers.Adam(LR)
