@@ -14,7 +14,7 @@ import random
 SEED = 42  
 np.random.seed(SEED)# Set seed for NumPy
 random.seed(SEED)# Set seed for Python random
-tf.random.set_seed(sSEED)# Set seed for TensorFlow (and Keras)
+tf.random.set_seed(SEED)# Set seed for TensorFlow (and Keras)
 
 # Environment setting
 DATA_DIR = r"C:\Users\smola\Documents\MASTER\TRY_Dataset"
