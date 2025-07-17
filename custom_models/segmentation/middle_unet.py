@@ -142,6 +142,7 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
     
     backbone2 = get_backbone(backbone_name2,   
                             input_tensor=input_tensor,
+                            input_shape=input_shape2,
                             weights=encoder_weights,
                             include_top=False)
 

@@ -23,40 +23,6 @@ class WeightedAverage(layers.Layer):
         return tf.reduce_sum(weights * inputs, axis=-1)
 
 
-class GridAttention(Model):
-    """
-    Applies grid-based spatial attention to features using a gating signal.
-
-    Args:
-        inter_channels (int): Number of intermediate channels. 
-                              Small values (e.g., 32) are efficient; larger values are more expressive.
-    
-    Adapted from Oktay et al. Attention Unet: https://arxiv.org/abs/1804.03999
-    """
-    def __init__(self, inter_channels=32):
-        super(GridAttention, self).__init__()
-        self.inter_channels = inter_channels
-
-        self.theta_x = layers.Conv2D(inter_channels, kernel_size=2, strides=2, padding='same')
-        self.upsample = layers.UpSampling2D(size=(2, 2))
-        self.phi_g = layers.Conv2D(inter_channels, kernel_size=1, strides=1, padding='same')
-        self.add = layers.Add()
-        self.relu = layers.Activation('relu')
-        self.attention_conv = layers.Conv2D(1, kernel_size=1)
-        self.sigmoid = layers.Activation('sigmoid')
-        self.multiply = layers.Multiply()
-
-    def call(self, features, gating):
-        theta_x = self.theta_x(features)
-        theta_x = self.upsample(theta_x)
-        phi_g = self.phi_g(gating)
-        add = self.add([theta_x, phi_g])
-        attention_map = self.relu(add)
-        attention_map = self.attention_conv(attention_map)
-        attention_map = self.sigmoid(attention_map)
-        attention_weighted = self.multiply([features, attention_map])
-        return attention_weighted
-
 
 class ChannelGate(layers.Layer):
     """

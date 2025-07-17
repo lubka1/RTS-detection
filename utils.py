@@ -8,6 +8,7 @@ and data augmentation for semantic segmentation tasks.
 import config  
 import fusion
 from custom_models.segmentation.middle_unet import MiddleUnet
+from cbam import attach_attention_module
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -59,7 +60,7 @@ def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_lea
             activation=config.activation,
             input_shape=(None, None, N)
         )
-    elif fusion_type == 'middle':   # chnage this function so that you use the same backbone but with different prefix
+    elif fusion_type == 'middle':   
         model = MiddleUnet(
             'midresnet50',
             'resnet50',
@@ -94,7 +95,7 @@ def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_lea
     return model
 
 
-def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights=None):
+def construct_late_unet(M, N, strategy='concat', attention=False, encoder_weights=None):
     """
     Construct a U-Net model using a late fusion strategy.
 
@@ -122,17 +123,10 @@ def construct_late_unet(M, N, strategy='concat', attention=None, encoder_weights
     features1 = model1_truncated(input1)
     features2 = model2_truncated(input2)
 
-
-    if attention == 'grid': 
-        attention_layer = fusion.GridAttention() # GridAttention is a cross-attention mechanism — it takes two inputs
-        features1 = attention_layer(features1, features2)
-        features2 = attention_layer(features2, features1)
-
-    elif attention == 'channel': # ChannelGate is a self-attention mechanism — it only needs its own feature map to decide which channels are important.
-        channel_gate1 = fusion.ChannelGate(features1.shape[-1])
-        channel_gate2 = fusion.ChannelGate(features2.shape[-1])
-        features1 = channel_gate1(features1)
-        features2 = channel_gate2(features2)
+    if attention:
+        print('With Attention')
+        features1 = attach_attention_module(features1)
+        features2 = attach_attention_module(features2)
 
     x = [features1, features2]
     if strategy == 'concat':

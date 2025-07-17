@@ -15,13 +15,18 @@ from tensorflow.keras import layers, Model, Input
 import wandb
 from wandb.integration.keras import WandbMetricsLogger, WandbModelCheckpoint
 
+print("[INFO] TensorFlow version:", tf.__version__)
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    print(f"[INFO] GPU(s) detected: {[gpu.name for gpu in gpus]}")
+else:
+    print("[INFO] No GPU detected. Training will use CPU.")
 
 BACKBONE = config.BACKBONE
 BATCH_SIZE = config.BATCH_SIZE
 LR = config.LR
 EPOCHS = config.EPOCHS
 preprocess_input = sm.get_preprocessing(BACKBONE)
-
 
 def train_model(fusion_type, strategy='concat', attention=None , transfer_learning=False):
         
@@ -37,7 +42,6 @@ def train_model(fusion_type, strategy='concat', attention=None , transfer_learni
     Returns:
         float: Best validation IoU score.
     """
-    
     print(f"\nStarting training with fusion type: {fusion_type}")
     print(f"[DEBUG] Strategy: {strategy}, Attention: {attention}, Transfer Learning: {transfer_learning}")
 
@@ -121,7 +125,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--fusion", type=str, required=True, choices=["early", "middle", "late"], help="Select fusion mode")
     parser.add_argument("--strategy", type=str, choices=["concat", "average"], default="concat", help="Select fusion strategy")
-    parser.add_argument("--attention", type=str, choices=["None", "grid", "channel"], default="None", help="Select attention strategy")
+    parser.add_argument("--attention", action="store_true", help="Enable CBAM attention")
     parser.add_argument("--transfer_learning", action='store_true', help="Use transfer learning (pretrained weights)") 
 
     args = parser.parse_args()
