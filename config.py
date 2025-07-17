@@ -39,7 +39,7 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 
 # Training Parameters
 BACKBONE = 'resnet50' 
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 LR = 0.0005 
 EPOCHS = 50
 
