@@ -11,7 +11,7 @@ Each of `train/`, `val/`, and `test/` has the same internal structure.
 
 ---
 
-## 🛰️ Sentinel-1 (S1)
+## Sentinel-1 (S1)
 
 - Located in the `S1/` folder.
 - Each sample includes two bands:
@@ -20,7 +20,7 @@ Each of `train/`, `val/`, and `test/` has the same internal structure.
 
 ---
 
-## 🛰️ Sentinel-2 (S2)
+##  Sentinel-2 (S2)
 
 - Located in the `S2/` folder.
 - Includes the following 12 bands (channels):
@@ -37,7 +37,7 @@ Each of `train/`, `val/`, and `test/` has the same internal structure.
 
 ---
 
-## 🖼Masks (optional)
+## Masks (optional)
 
 - Located in the `Masks/` folder (for each split).
 - These are the ground truth labels (e.g., for segmentation or classification tasks).
