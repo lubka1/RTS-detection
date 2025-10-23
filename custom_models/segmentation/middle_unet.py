@@ -8,11 +8,12 @@ from keras.layers import BatchNormalization
 from keras.layers import Activation
 from keras.layers import Concatenate
 from keras.models import Model
-import numpy as np
-import fusion
-
 import tensorflow as tf
 from tensorflow.keras import layers
+import numpy as np
+
+import fusion
+import cbam 
 
 import sys
 import os
@@ -106,7 +107,8 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
          upsample_rates=(2,2,2,2,2),
          classes=1,
          activation='sigmoid',
-         strategy='concat'):
+         strategy='concat',
+         attention=False):
     """
 
     Args:
@@ -164,20 +166,23 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
     skip1 = [backbone1.layers[idx].output for idx in skip_connection_idx1]
     skip2 = [backbone2.layers[idx].output for idx in skip_connection_idx2]
 
-    # Combine skip connections (e.g., concatenate)
+    # Combine skip connections 
     combined_skips = [Concatenate()([s1, s2]) for s1, s2 in zip(skip1, skip2)]
 
-    # Build the decoder using combined skip connections
+    if attention:
+        print('With Attention')
+        features1 = cbam.attach_attention_module(backbone1.output)
+        features2 = cbam.attach_attention_module(backbone2.output)
+        x = [features1, features2]
+    else:
+        x = [backbone1.output, backbone2.output]
 
-    x = [backbone1.output, backbone2.output]
     if strategy == 'concat':
         x = Concatenate()(x)
     elif strategy == 'average':
-        fusion.WeightedAverage(n_output=len(x))(x)
+        x = fusion.WeightedAverage(n_output=len(x))(x)
 
-        
     for i in range(n_upsample_blocks):
-        # Use combined skip connections
         skip_connection = combined_skips[i] if i < len(combined_skips) else None
 
         upsample_rate = to_tuple(upsample_rates[i])

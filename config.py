@@ -12,22 +12,18 @@ import numpy as np
 import random
 
 SEED = 42  
-np.random.seed(SEED)# Set seed for NumPy
-random.seed(SEED)# Set seed for Python random
-tf.random.set_seed(SEED)# Set seed for TensorFlow (and Keras)
+np.random.seed(SEED)
+random.seed(SEED)
+tf.random.set_seed(SEED)
 
 # Environment setting
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
-
 S1_train_dir = os.path.join(DATA_DIR, 'train', 'S1')
 S1_valid_dir = os.path.join(DATA_DIR, 'val', 'S1')
-
 DEM_train = os.path.join(DATA_DIR, 'train', 'DEM')
 DEM_val = os.path.join(DATA_DIR, 'val', 'DEM')
-
 S2_train_dir = os.path.join(DATA_DIR, 'train', 'S2')
 S2_valid_dir = os.path.join(DATA_DIR, 'val', 'S2')
-
 y_train_dir = os.path.join(DATA_DIR, 'train', 'Masks')
 y_valid_dir = os.path.join(DATA_DIR, 'val', 'Masks')
 
@@ -39,9 +35,9 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 
 # Training Parameters
 BACKBONE = 'resnet50' 
-BATCH_SIZE = 16
+BATCH_SIZE = 4
 LR = 0.0005 
-EPOCHS = 100
+EPOCHS = 50
 
 activation = 'sigmoid' 
 optim = keras.optimizers.Adam(LR)

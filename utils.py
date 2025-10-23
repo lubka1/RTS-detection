@@ -8,6 +8,7 @@ and data augmentation for semantic segmentation tasks.
 import config  
 import fusion
 from custom_models.segmentation.middle_unet import MiddleUnet
+from custom_models.segmentation.xnet import Xnet
 from cbam import attach_attention_module
 
 import numpy as np
@@ -29,7 +30,7 @@ preprocess_input = sm.get_preprocessing(BACKBONE)
 
 
 
-def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_learning=False, model_path=None):
+def load_model(fusion_type, N, M, strategy='concat', attention=False,transfer_learning=False, model_path=None):
     """
     Load and return a segmentation model based on fusion type and other settings.
 
@@ -53,7 +54,8 @@ def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_lea
         logging.info("Using Imagenet pre-trained weights")
     
     if fusion_type == 'early':
-        model = sm.Unet(
+        #model = sm.Unet( 
+        model = Xnet(
             BACKBONE,
             encoder_weights=encoder_weights,
             classes=1,
@@ -68,7 +70,9 @@ def load_model(fusion_type, N, M, strategy='concat', attention=None,transfer_lea
             classes=1,
             activation=config.activation,
             input_shape1=(None, None, M),
-            input_shape2=(None, None, N)
+            input_shape2=(None, None, N),
+            strategy=strategy,
+            attention=attention
         )
     elif fusion_type == 'late':
         model = construct_late_unet(M, N, strategy, attention, encoder_weights)
@@ -109,8 +113,12 @@ def construct_late_unet(M, N, strategy='concat', attention=False, encoder_weight
     Returns:
         keras.Model: A compiled Keras model with late fusion.
     """
-    model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M))
-    model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
+    #model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M))
+    #model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
+
+    model1 = Xnet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M))
+    model2 = Xnet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
+
 
     input1 = Input(shape=(None, None, M))  # S1
     input2 = Input(shape=(None, None, N))  # S2
@@ -119,7 +127,6 @@ def construct_late_unet(M, N, strategy='concat', attention=False, encoder_weight
     model1_truncated = Model(inputs=model1.input, outputs=model1.layers[-2].output)  
     model2_truncated = Model(inputs=model2.input, outputs=model2.layers[-2].output)  
 
-    # Get features from the truncated models
     features1 = model1_truncated(input1)
     features2 = model2_truncated(input2)
 
@@ -134,9 +141,8 @@ def construct_late_unet(M, N, strategy='concat', attention=False, encoder_weight
     elif strategy == 'average':
         fusion_output = fusion.WeightedAverage(n_output=len(x))(x)
 
-    # final convolution layer
     output = layers.Conv2D(
-        filters=1,  # Number of output classes 
+        filters=1, 
         kernel_size=(3, 3),
         padding='same',
         use_bias=True,

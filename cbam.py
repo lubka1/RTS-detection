@@ -1,5 +1,9 @@
-# keras implementation of CBAM
-# https://github.com/kobiso/CBAM-keras/blob/master/models/attention_module.py
+"""
+CBAM: Convolutional Block Attention Module (Keras implementation)
+Original by: K. Woo, S. Park, J. Lee, I. Kweon
+Source: https://github.com/kobiso/CBAM-keras/blob/master/models/attention_module.py
+License: MIT
+"""
 
 from tensorflow.keras.layers import (
     GlobalAveragePooling2D,

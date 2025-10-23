@@ -24,33 +24,6 @@ class WeightedAverage(layers.Layer):
 
 
 
-class ChannelGate(layers.Layer):
-    """
-    Learns channel-wise attention weights for a feature map.
-
-    Args:
-        gate_channels (int): Number of input channels.
-        reduction_ratio (int): Reduction ratio for intermediate layer. Smaller values (e.g., 16) for light models.
-
-    Channel attention mechanism adapted from the CBAM paper:
-    https://github.com/Jongchan/attention-module/blob/5d3a54af0f6688bedca3f179593dff8da63e8274/MODELS/cbam.py#L26
-    """
-    def __init__(self, gate_channels, reduction_ratio=32):
-        super(ChannelGate, self).__init__()
-        self.gate_channels = gate_channels
-        self.reduction_ratio = reduction_ratio
-
-        self.global_avg_pool = layers.GlobalAveragePooling2D()
-        self.dense1 = layers.Dense(gate_channels // reduction_ratio, activation='relu')
-        self.dense2 = layers.Dense(gate_channels, activation='sigmoid')
-
-    def call(self, x):
-        avg_pool = self.global_avg_pool(x)
-        channel_att_raw = self.dense1(avg_pool)
-        channel_att_raw = self.dense2(channel_att_raw)
-        scale = tf.expand_dims(tf.expand_dims(channel_att_raw, 1), 1)
-        scale = tf.broadcast_to(scale, tf.shape(x))
-        return x * scale
 
 
 class ResidualCorrectionNet(Model):
