@@ -1,0 +1,17 @@
+early Unet
+early xnet
+middle Unet concat
+middle Unet average
+middle Unet any attention
+late Unet concat
+late Unet average
+late Unet any attention
+late Xnet concat
+late Xnet average
+late Xnet any attention
+
+
+
+--fusion late --strategy average --attention
+-fusion late --strategy average
+--fusion middle --strategy concat --attention  
