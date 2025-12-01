@@ -7,13 +7,13 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0" # oneDNN can introduce floating-point variability, turn it off
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Disable most TensorFlow logs
 warnings.filterwarnings("ignore")          # Disable Python warnings
-
+os.environ["TF_XLA_FLAGS"] = "--tf_xla_enable_xla_devices=false"
+ 
 import tensorflow as tf
 import tensorflow.keras as keras
 import segmentation_models as sm
 import numpy as np
 import random
-from utils import masked_total_loss
 
 SEED = 42  
 np.random.seed(SEED)
