@@ -10,6 +10,7 @@ from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
+tf.debugging.set_log_device_placement(True)
 import tensorflow.keras as keras
 import segmentation_models as sm
 from tensorflow.keras import layers, Model, Input

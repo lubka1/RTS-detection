@@ -45,11 +45,9 @@ def get_data(fusion_type):
             image, mask = train_dataset[12]  
             N = image.shape[-1]
             M = None
-            print(N)
 
             train_dataloader = Dataloder(train_dataset, batch_size=BATCH_SIZE, shuffle=True)   
             valid_dataloader = Dataloder(val_dataset, batch_size=1, shuffle=False)
-            print(train_dataloader[0][1].shape)
 
             if train_dataloader[0][0].shape != (BATCH_SIZE, 256, 256, N):
                 raise ValueError(f"Input shape: {train_dataloader[0][0].shape}, expected: (BATCH_SIZE, 256, 256, {N})")
