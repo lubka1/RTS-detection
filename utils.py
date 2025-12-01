@@ -274,4 +274,40 @@ class RandomChoice(A.BasicTransform):
     def get_transform_init_args_names(self):
         return ('transforms',)
 
+# CUSTOM LOSS
 
+alpha = 0.9
+gamma = 2.0
+ignore_index = 0  # nodata value in your masks
+
+def masked_total_loss(y_true, y_pred, input_image):
+    # Mask valid pixels based on image
+    mask = tf.cast(tf.not_equal(input_image, 0), tf.float32)
+    mask = tf.reduce_max(mask, axis=-1, keepdims=True)  # collapse channels
+
+    # Compute losses
+    focal = sm.losses.BinaryFocalLoss(alpha=alpha, gamma=gamma)(y_true, y_pred) * mask
+    dice = sm.losses.DiceLoss()(y_true, y_pred) * mask
+
+    # Normalize by number of valid pixels
+    total = (tf.reduce_sum(focal) + tf.reduce_sum(dice)) / (tf.reduce_sum(mask) + 1e-8)
+    return total
+
+def masked_focal_dice_loss(y_true, y_pred):
+    """
+    Compute Binary Focal Loss + Dice Loss, masking nodata pixels (0 in y_true).
+    """
+    # Mask valid pixels
+    mask = tf.cast(tf.not_equal(y_true, ignore_index), tf.float32)
+
+    # Compute focal loss
+    focal = sm.losses.BinaryFocalLoss(alpha=alpha, gamma=gamma)(y_true, y_pred)
+    focal = focal * mask
+
+    # Compute dice loss
+    dice = sm.losses.DiceLoss()(y_true, y_pred)
+    dice = dice * mask
+
+    # Normalize by number of valid pixels
+    total_loss = (tf.reduce_sum(focal) + tf.reduce_sum(dice)) / (tf.reduce_sum(mask) + 1e-8)
+    return total_loss
