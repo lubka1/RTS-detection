@@ -62,7 +62,7 @@ def get_data(fusion_type):
                 images_dir1=config.S1_train_dir,  
                 images_dir2=config.S2_train_dir,  
                 masks_dir=config.y_train_dir,  
-              #  dem_dir=config.DEM_train, 
+                dem_dir=config.DEM_train, 
                 classes=['rts'],  
                augmentation=utils.get_training_augmentation(),  
                 preprocessing=utils.get_preprocessing(preprocess_input),  
@@ -73,7 +73,7 @@ def get_data(fusion_type):
                 images_dir1=config.S1_valid_dir,  
                 images_dir2=config.S2_valid_dir,  
                 masks_dir=config.y_valid_dir,  
-              #  dem_dir=config.DEM_val,
+                dem_dir=config.DEM_val,
                 classes=['rts'],
                 augmentation=None,  # No augmentation for validation
                 preprocessing=utils.get_preprocessing(preprocess_input), 

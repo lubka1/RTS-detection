@@ -275,7 +275,7 @@ class RandomChoice(A.BasicTransform):
         return ('transforms',)
 
 # CUSTOM LOSS
-
+'''
 alpha = 0.9
 gamma = 2.0
 ignore_index = 0  # nodata value in your masks
@@ -311,3 +311,4 @@ def masked_focal_dice_loss(y_true, y_pred):
     # Normalize by number of valid pixels
     total_loss = (tf.reduce_sum(focal) + tf.reduce_sum(dice)) / (tf.reduce_sum(mask) + 1e-8)
     return total_loss
+'''

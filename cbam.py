@@ -27,7 +27,8 @@ def attach_attention_module(net):
   return net
 
 def cbam_block(cbam_feature, ratio=8):
-	"""Contains the implementation of Convolutional Block Attention Module(CBAM) block.
+	"""
+    Contains the implementation of Convolutional Block Attention Module(CBAM) block.
 	As described in https://arxiv.org/abs/1807.06521.
 	"""
 	

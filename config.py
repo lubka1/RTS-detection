@@ -1,9 +1,12 @@
 import os
+import warnings
 
 # The backend must be configured before importing Keras, and the backend cannot be changed after the package has been imported. https://keras.io/getting_started/#configuring-your-backend
 os.environ["SM_FRAMEWORK"] = "tf.keras"
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0" # oneDNN can introduce floating-point variability, turn it off
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Disable most TensorFlow logs
+warnings.filterwarnings("ignore")          # Disable Python warnings
 
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -36,7 +39,7 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 
 # Training Parameters
 BACKBONE = 'resnet50' 
-BATCH_SIZE = 4
+BATCH_SIZE = 16
 LR = 0.0005 
 EPOCHS = 50
 
@@ -50,4 +53,4 @@ focal_loss = sm.losses.BinaryFocalLoss(alpha=alpha, gamma=gamma)
 dice_loss = sm.losses.DiceLoss()
 total_loss = focal_loss + dice_loss 
 
-total_loss= masked_total_loss
+#total_loss= masked_total_loss
