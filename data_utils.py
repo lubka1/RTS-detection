@@ -84,7 +84,11 @@ def get_data(fusion_type):
             # Determine the number of channels in the images
             (images1, images2), mask = train_dataset[0]
             M = images1.shape[-1]  
-            N = images2.shape[-1]  
+            N = images2.shape[-1] 
+            print(M)
+            print(N) 
+            print(train_dataloader[0][0][0].shape)
+            print(train_dataloader[0][0][1].shape)
 
             if train_dataloader[0][0][0].shape != (BATCH_SIZE, 256, 256, M):
                 raise ValueError(f"Expected image1 shape {(BATCH_SIZE, 256, 256, M)}, but got {train_dataloader[0][0][0].shape}")
