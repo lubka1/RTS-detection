@@ -88,6 +88,7 @@ def train_model(fusion_type, strategy='concat', attention=None , transfer_learni
     
     callbacks = [
         keras.callbacks.ModelCheckpoint(f'best_{fusion_type}{strategy}{attention}.weights.h5', save_weights_only=True, save_best_only=True, monitor='val_binary_io_u', mode='max'),
+        #keras.callbacks.ModelCheckpoint('best_f1.weights.h5', monitor='val_f_score', save_best_only=True, save_weights_only=True, mode='max'),
         keras.callbacks.ReduceLROnPlateau(monitor='val_binary_io_u', factor=0.5, patience=6, verbose=1, min_lr=5e-5),   
         keras.callbacks.EarlyStopping(monitor='val_binary_io_u', patience=10),
         WandbMetricsLogger(),
