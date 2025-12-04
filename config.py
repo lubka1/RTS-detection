@@ -39,9 +39,14 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 
 # Training Parameters
 BACKBONE = 'resnet50' 
-BATCH_SIZE = 16
-LR = 0.0001    #0.0005 
+BATCH_SIZE = 16   #32        16 
+LR = 0.001    #0.0005      0.0001
 EPOCHS = 50
+
+patienceRLR = 6 # patience for ReduceLearningRate
+factor = 0.5
+patienceES = 10 # patience for early stopping
+
 
 activation = 'sigmoid' 
 optim = keras.optimizers.Adam(LR)
