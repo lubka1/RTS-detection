@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import rasterio
 import segmentation_models as sm
 import tensorflow.keras as keras
+import tensorflow as tf
+
 
 BACKBONE = config.BACKBONE
 BATCH_SIZE = config.BATCH_SIZE
@@ -370,7 +372,9 @@ class Dataloder(keras.utils.Sequence):
         # transpose list of lists
         batch = [np.stack(samples, axis=0) for samples in zip(*data)]
         
-        return batch
+        #return batch
+        return [tf.convert_to_tensor(b, dtype=tf.float32) for b in batch]
+
     
     
     def __len__(self):
@@ -474,42 +478,9 @@ class FusionDataloder(Dataloder):
         images2 = np.array(images2)
         masks = np.stack(masks, axis=0)
         
-        return (images1, images2), masks
-
- 
-    
-class FusionDataloder(Dataloder):
-    """Loads data from FusionDataset and forms batches for middle fusion.
-    
-    Inherits:
-        Dataloder: Base data loader class.
-
-    Args:
-        dataset: Instance of FusionDataset for loading and preprocessing images.
-        batch_size: Integer, number of images per batch.
-        shuffle: Boolean, if True, shuffles indexes each epoch.
-    """
-    def __init__(self, dataset, batch_size=1, shuffle=False, **kwargs):
-        # Initialize parent class Dataloder
-        super().__init__(dataset, batch_size=batch_size, shuffle=shuffle, **kwargs)
-    
-    def __getitem__(self, index):
-        # Collect batch data
-        start = index * self.batch_size
-        stop = (index + 1) * self.batch_size
-        data = [self.dataset[i] for i in self.indexes[start:stop]]
-        
-        images1, images2, masks = [], [], []
-        
-        for (image1, image2), mask in data:
-            images1.append(image1)
-            images2.append(image2)
-            masks.append(mask)
-        
-        # Convert lists to numpy arrays
-        images1 = np.array(images1)
-        images2 = np.array(images2)
-        masks = np.stack(masks, axis=0)
-        
-        return (images1, images2), masks
+        #return (images1, images2), masks
+        return (
+            tf.convert_to_tensor(images1, dtype=tf.float32),
+            tf.convert_to_tensor(images2, dtype=tf.float32),
+        ), tf.convert_to_tensor(masks, dtype=tf.float32)
 

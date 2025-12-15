@@ -8,6 +8,7 @@ and data augmentation for semantic segmentation tasks.
 import config  
 import fusion
 from custom_models.segmentation.middle_unet import MiddleUnet
+from custom_models.segmentation.middle_xnet import MiddleXnet
 from custom_models.segmentation.xnet import Xnet
 from cbam import attach_attention_module
 
@@ -21,16 +22,12 @@ from tensorflow.keras import layers, Model, Input
 import logging
 logging.basicConfig(level=logging.INFO)
 
+from config import BACKBONE, TL, STRATEGY, ATTENTION
 
-BACKBONE = config.BACKBONE
-BATCH_SIZE = config.BATCH_SIZE
-LR = config.LR
-EPOCHS = config.EPOCHS
 preprocess_input = sm.get_preprocessing(BACKBONE)
 
 
-
-def load_model(fusion_type, N, M, strategy='concat', attention=False,transfer_learning=False, model_path=None):
+def load_model(fusion_type, N, M, model_path=None):
     """
     Load and return a segmentation model based on fusion type and other settings.
 
@@ -40,57 +37,39 @@ def load_model(fusion_type, N, M, strategy='concat', attention=False,transfer_le
         M (int): Number of input channels for input1.
         strategy (str): Fusion strategy for late fusion ('concat', 'average'). 
         attention (str, optional): Attention mechanism to use ('grid', 'channel').
-        transfer_learning (bool): Whether to use pretrained ImageNet weights.
         model_path (str, optional): Path to load saved weights.
 
     Returns:
         keras.Model: Constructed and optionally preloaded model.
     """
-     
-    encoder_weights = None  # default
-
-    if transfer_learning:
-        encoder_weights = 'imagenet'
-        logging.info("Using Imagenet pre-trained weights")
-    
+         
     if fusion_type == 'early':
         #model = sm.Unet( 
         model = Xnet(
             BACKBONE,
-            encoder_weights=encoder_weights,
+            encoder_weights=None,
             classes=1,
             activation=config.activation,
-            input_shape=(None, None, N)
+            input_shape=(None, None, N),
+            transfer_learning=TL
         )
     elif fusion_type == 'middle':   
-        model = MiddleUnet(
+        model = MiddleXnet(
             'midresnet50',
             'resnet50',
-            encoder_weights=encoder_weights,
+            encoder_weights=None,
             classes=1,
             activation=config.activation,
             input_shape1=(None, None, M),
             input_shape2=(None, None, N),
-            strategy=strategy,
-            attention=attention
+            strategy=STRATEGY,
+            attention=ATTENTION
         )
     elif fusion_type == 'late':
-        model = construct_late_unet(M, N, strategy, attention, encoder_weights)
+        model = construct_late_unet(M, N)
     else:
         raise ValueError("Fusion type not recognized.")
     
-    '''
-    # Get the first convolutional layer
-    first_layer = model.layers[0]
-
-    # If transfer_learning is True and N > 3, modify the first layer weights
-    if transfer_learning and N > 3:
-        # Reinitialize the first layer's weights (since it doesn't match pretrained weights for N > 3)
-        first_layer.set_weights([tf.random.normal(w.shape) for w in first_layer.get_weights()])  # Random initialization
-        # Load the pretrained weights for all layers except the first layer
-    if encoder_weights == 'imagenet' and N <= 3:
-        model.load_weights(model_path, by_name=True, skip_mismatch=True)
-    '''
     
     # Load saved weights if provided, for testing purposes
     if model_path:
@@ -99,7 +78,7 @@ def load_model(fusion_type, N, M, strategy='concat', attention=False,transfer_le
     return model
 
 
-def construct_late_unet(M, N, strategy='concat', attention=False, encoder_weights=None):
+def construct_late_unet(M, N, encoder_weights=None):
     """
     Construct a U-Net model using a late fusion strategy.
 
@@ -116,29 +95,28 @@ def construct_late_unet(M, N, strategy='concat', attention=False, encoder_weight
     #model1 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M))
     #model2 = sm.Unet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
 
-    model1 = Xnet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, M))
-    model2 = Xnet(BACKBONE, encoder_weights=encoder_weights,classes = 1, activation=config.activation, input_shape=(None, None, N))
+    model1 = Xnet(BACKBONE, encoder_weights=None,classes = 1, activation=config.activation, input_shape=(None, None, M), transfer_learning=TL)
+    model2 = Xnet(BACKBONE, encoder_weights=None,classes = 1, activation=config.activation, input_shape=(None, None, N), transfer_learning=TL)
 
 
     input1 = Input(shape=(None, None, M))  # S1
     input2 = Input(shape=(None, None, N))  # S2
 
-    # Truncate the models to second-to-last layer
-    model1_truncated = Model(inputs=model1.input, outputs=model1.layers[-2].output)  
-    model2_truncated = Model(inputs=model2.input, outputs=model2.layers[-2].output)  
+    model1_truncated = Model(inputs=model1.input, outputs=model1.layers[-3].output)  # -3 because we want the layer before the final conv
+    model2_truncated = Model(inputs=model2.input, outputs=model2.layers[-3].output)
 
     features1 = model1_truncated(input1)
     features2 = model2_truncated(input2)
 
-    if attention:
+    if ATTENTION == True:
         print('With Attention')
         features1 = attach_attention_module(features1)
         features2 = attach_attention_module(features2)
 
     x = [features1, features2]
-    if strategy == 'concat':
+    if STRATEGY == 'concat':
         fusion_output = layers.Concatenate(axis=-1, name="concat_features")(x)
-    elif strategy == 'average':
+    elif STRATEGY == 'average':
         fusion_output = fusion.WeightedAverage(n_output=len(x))(x)
 
     output = layers.Conv2D(

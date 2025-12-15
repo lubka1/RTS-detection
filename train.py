@@ -28,9 +28,17 @@ BACKBONE = config.BACKBONE
 BATCH_SIZE = config.BATCH_SIZE
 LR = config.LR
 EPOCHS = config.EPOCHS
+patienceRLR = config.patienceRLR
+patienceES = config.patienceES
+factor = config.factor
 preprocess_input = sm.get_preprocessing(BACKBONE)
 
-def train_model(fusion_type, strategy='concat', attention=None , transfer_learning=False):
+STRATEGY = config.STRATEGY
+ATTENTION = config.ATTENTION
+TL = config.TL
+
+
+def train_model(fusion_type):
         
     """
     Train the fusion model based on selected configuration.
@@ -45,37 +53,30 @@ def train_model(fusion_type, strategy='concat', attention=None , transfer_learni
         float: Best validation IoU score.
     """
     print(f"\nStarting training with fusion type: {fusion_type}")
-    print(f"[DEBUG] Strategy: {strategy}, Attention: {attention}, Transfer Learning: {transfer_learning}")
+    print(f"[DEBUG] Strategy: {STRATEGY}, Attention: {ATTENTION}, Transfer Learning: {TL}")
 
     # Initialize wandb
     wandb.init(
         project="fusion-unet",  
-        name=f"train_{fusion_type}_{strategy}_{attention}",  
+        name=f"train_{fusion_type}_{STRATEGY}_{ATTENTION}",  
         config={
             "fusion_type": fusion_type,
             "epochs": EPOCHS,
             "batch_size": BATCH_SIZE,
             "learning_rate": LR,
             "backbone": BACKBONE,
-            "strategy": strategy,
-            "attention": attention,
-            "transfer_learning": transfer_learning
+            "strategy": STRATEGY,
+            "attention": ATTENTION,
+            "transfer_learning": TL
         },
         sync_tensorboard=False,
         reinit=True,
         #settings=wandb.Settings(_disable_stats=True)  # Asynchronous upload and no summary stats (system metrics like CPU/GPU usage, memory usage)
     )
 
-    # Load data
     train_dataloader, val_dataloader, N, M = data_utils.get_data(fusion_type)
 
-    # Build model
-    model = utils.load_model(
-        fusion_type, N, M, 
-        strategy=strategy, 
-        attention=attention, 
-        transfer_learning=transfer_learning
-    )  
+    model = utils.load_model(fusion_type, N, M)  
 
     model.compile(
         config.optim, 
@@ -87,10 +88,10 @@ def train_model(fusion_type, strategy='concat', attention=None , transfer_learni
     )
     
     callbacks = [
-        keras.callbacks.ModelCheckpoint(f'best_{fusion_type}{strategy}{attention}.weights.h5', save_weights_only=True, save_best_only=True, monitor='val_binary_io_u', mode='max'),
+        keras.callbacks.ModelCheckpoint(f'best_{fusion_type}{STRATEGY}{ATTENTION}.weights.h5', save_weights_only=True, save_best_only=True, monitor='val_binary_io_u', mode='max'),
         #keras.callbacks.ModelCheckpoint('best_f1.weights.h5', monitor='val_f_score', save_best_only=True, save_weights_only=True, mode='max'),
-        keras.callbacks.ReduceLROnPlateau(monitor='val_binary_io_u', factor=0.5, patience=6, verbose=1, min_lr=5e-5),   
-        keras.callbacks.EarlyStopping(monitor='val_binary_io_u', patience=10),
+        keras.callbacks.ReduceLROnPlateau(monitor='val_binary_io_u', factor=factor, patience=patienceRLR, verbose=1, min_lr=5e-5),   
+        keras.callbacks.EarlyStopping(monitor='val_binary_io_u', patience=patienceES),
         WandbMetricsLogger(),
         ]
     
@@ -102,6 +103,8 @@ def train_model(fusion_type, strategy='concat', attention=None , transfer_learni
         epochs=EPOCHS, 
         callbacks=callbacks, 
         validation_data=val_dataloader, 
+        workers=0,
+        use_multiprocessing=False,
     )
     elapsed_time = time.time() - start_time
     print('Training complete. Elapsed time: '+str(elapsed_time))
@@ -127,16 +130,10 @@ def train_model(fusion_type, strategy='concat', attention=None , transfer_learni
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--fusion", type=str, required=True, choices=["early", "middle", "late"], help="Select fusion mode")
-    parser.add_argument("--strategy", type=str, choices=["concat", "average"], default="concat", help="Select fusion strategy")
-    parser.add_argument("--attention", action="store_true", help="Enable CBAM attention")
-    parser.add_argument("--transfer_learning", action='store_true', help="Use transfer learning (pretrained weights)") 
 
     args = parser.parse_args()
-    attention = None if args.attention == "None" else args.attention
 
-    print(f"[INFO] STarting training fusion: {args.fusion}, Strategy: {args.strategy}, Attention: {attention}, Transfer Learning: {args.transfer_learning}")
-
-    best_iou = train_model(args.fusion, strategy=args.strategy, attention=args.attention, transfer_learning=args.transfer_learning)
+    best_iou = train_model(args.fusion)
 
     print(f"[RESULT] Best Validation IoU for fusion type '{args.fusion}': {best_iou:.4f}")
 

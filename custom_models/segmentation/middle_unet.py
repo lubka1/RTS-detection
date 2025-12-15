@@ -17,7 +17,7 @@ import cbam
 
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))   #??????
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))   
 
 # blocks.py
 def handle_block_names(stage):
@@ -198,7 +198,6 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
     x = Conv2D(classes, (3, 3), padding='same', name='final_conv')(x)
     x = Activation(activation, name=activation)(x)
 
-    # Create the model
     model = Model([backbone1.input, backbone2.input], x)
  
 

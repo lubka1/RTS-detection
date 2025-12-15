@@ -1,4 +1,4 @@
-# https://github.com/MrGiovanni/UNetPlusPlus/tree/master/keras/segmentation_models/unet
+# https://github.com/MrGiovanni/UNetPlusPlus/tree/master/keras/segmentation_models/xnet
 # blocks, builder and model in one
 
 from keras.layers import Conv2DTranspose
@@ -17,15 +17,16 @@ import cbam
 
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))   #??????
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))   
 
 # blocks.py
-def handle_block_names(stage):
-    conv_name = 'decoder_stage{}_conv'.format(stage)
-    bn_name = 'decoder_stage{}_bn'.format(stage)
-    relu_name = 'decoder_stage{}_relu'.format(stage)
-    up_name = 'decoder_stage{}_upsample'.format(stage)
-    return conv_name, bn_name, relu_name, up_name
+def handle_block_names(stage, cols):
+    conv_name = 'decoder_stage{}-{}_conv'.format(stage, cols)
+    bn_name = 'decoder_stage{}-{}_bn'.format(stage, cols)
+    relu_name = 'decoder_stage{}-{}_relu'.format(stage, cols)
+    up_name = 'decoder_stage{}-{}_upsample'.format(stage, cols)
+    merge_name = 'merge_{}-{}'.format(stage, cols)
+    return conv_name, bn_name, relu_name, up_name, merge_name
 
 
 def ConvRelu(filters, kernel_size, use_batchnorm=False, conv_name='conv', bn_name='bn', relu_name='relu'):
@@ -38,17 +39,20 @@ def ConvRelu(filters, kernel_size, use_batchnorm=False, conv_name='conv', bn_nam
     return layer
 
 
-def Upsample2D_block(filters, stage, kernel_size=(3,3), upsample_rate=(2,2),
+def Upsample2D_block(filters, stage, cols, kernel_size=(3,3), upsample_rate=(2,2),
                      use_batchnorm=False, skip=None):
 
     def layer(input_tensor):
 
-        conv_name, bn_name, relu_name, up_name = handle_block_names(stage)
+        conv_name, bn_name, relu_name, up_name, merge_name = handle_block_names(stage, cols)
 
         x = UpSampling2D(size=upsample_rate, name=up_name)(input_tensor)
 
-        if skip is not None:
-            x = Concatenate()([x, skip])
+        if (type(skip) != list and skip is not None) or (type(skip) == list and None not in skip):
+            if type(skip) is list:
+                x = Concatenate(name=merge_name)([x] + skip)
+            else:
+                x = Concatenate(name=merge_name)([x, skip])
 
         x = ConvRelu(filters, kernel_size, use_batchnorm=use_batchnorm,
                      conv_name=conv_name + '1', bn_name=bn_name + '1', relu_name=relu_name + '1')(x)
@@ -60,12 +64,12 @@ def Upsample2D_block(filters, stage, kernel_size=(3,3), upsample_rate=(2,2),
     return layer
 
 
-def Transpose2D_block(filters, stage, kernel_size=(3,3), upsample_rate=(2,2),
+def Transpose2D_block(filters, stage, cols, kernel_size=(3,3), upsample_rate=(2,2),
                       transpose_kernel_size=(4,4), use_batchnorm=False, skip=None):
 
     def layer(input_tensor):
 
-        conv_name, bn_name, relu_name, up_name = handle_block_names(stage)
+        conv_name, bn_name, relu_name, up_name, merge_name = handle_block_names(stage, cols)
 
         x = Conv2DTranspose(filters, transpose_kernel_size, strides=upsample_rate,
                             padding='same', name=up_name, use_bias=not(use_batchnorm))(input_tensor)
@@ -73,8 +77,16 @@ def Transpose2D_block(filters, stage, kernel_size=(3,3), upsample_rate=(2,2),
             x = BatchNormalization(name=bn_name+'1')(x)
         x = Activation('relu', name=relu_name+'1')(x)
 
-        if skip is not None:
-            x = Concatenate()([x, skip])
+        if (type(skip) != list and skip is not None) or (type(skip) == list and None not in skip):
+            # print("\nskip = {}".format(skip))
+            if type(skip) is list:
+                merge_list = []
+                merge_list.append(x)
+                for l in skip:
+                    merge_list.append(l)
+                x = Concatenate(name=merge_name)(merge_list)
+            else:
+                x = Concatenate(name=merge_name)([x, skip])
 
         x = ConvRelu(filters, kernel_size, use_batchnorm=use_batchnorm,
                      conv_name=conv_name + '2', bn_name=bn_name + '2', relu_name=relu_name + '2')(x)
@@ -94,7 +106,7 @@ DEFAULT_SKIP_CONNECTIONS = {
 }
 
 
-def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16', 
+def MiddleXnet(backbone_name1='vgg16', backbone_name2='vgg16', 
          input_shape1=(None, None, 2), input_shape2=(None, None, 11),
          input_tensor=None,
          encoder_weights='imagenet',
@@ -150,91 +162,118 @@ def MiddleUnet(backbone_name1='vgg16', backbone_name2='vgg16',
                             include_top=False)
 
     if skip_connections == 'default':
-        skip_connections1 = DEFAULT_SKIP_CONNECTIONS[backbone_name1]
-        skip_connections2 = DEFAULT_SKIP_CONNECTIONS[backbone_name2]
+        skip_connection_layers_1 = DEFAULT_SKIP_CONNECTIONS[backbone_name1]
+        skip_connection_layers_2 = DEFAULT_SKIP_CONNECTIONS[backbone_name2]
     else:
-        skip_connections1 = skip_connections
-        skip_connections2 = skip_connections
+        skip_connection_layers_1 = skip_connections
+        skip_connection_layers_2 = skip_connections
 
     # builder.py
-    if block_type == 'transpose':
-        up_block = Transpose2D_block
-    else:
-        up_block = Upsample2D_block
+    #  bez transpose
     
-    if len(skip_connections1) > n_upsample_blocks:
-        downsampling_layers1 = skip_connection_layers1[int(len(skip_connection_layers1)/2):]
-        skip_connection_layers1 = skip_connection_layers1[:int(len(skip_connection_layers1)/2)]
+    up_block = Upsample2D_block
+    
+    if len(skip_connection_layers_1) > n_upsample_blocks:
+        downsampling_layers_1 = skip_connection_layers_1[int(len(skip_connection_layers_1)/2):]
+        skip_connection_layers_1 = skip_connection_layers_1[:int(len(skip_connection_layers_1)/2)]
     else:
-        downsampling_layers1 = skip_connection_layers1
+        downsampling_layers_1 = skip_connection_layers_1
 
-    if len(skip_connections2) > n_upsample_blocks:
-        downsampling_layers2 = skip_connection_layers1[int(len(skip_connection_layers2)/2):]
-        skip_connection_layers2 = skip_connection_layers2[:int(len(skip_connection_layers2)/2)]
+    if len(skip_connection_layers_2) > n_upsample_blocks:
+        downsampling_layers_2 = skip_connection_layers_2[int(len(skip_connection_layers_2)/2):]
+        skip_connection_layers_2 = skip_connection_layers_2[:int(len(skip_connection_layers_2)/2)]
     else:
-        downsampling_layers2 = skip_connection_layers2
+        downsampling_layers_2 = skip_connection_layers_2
 
     # Convert layer names to indices
-    skip_connection_idx1 = [get_layer_number(backbone1, l) if isinstance(l, str) else l
-                           for l in skip_connections1]
-    skip_connection_idx2 = [get_layer_number(backbone2, l) if isinstance(l, str) else l
-                           for l in skip_connections2]
+    skip_connection_idx_1 = [get_layer_number(backbone1, l) if isinstance(l, str) else l
+                           for l in skip_connection_layers_1]
+    skip_connection_idx_2 = [get_layer_number(backbone2, l) if isinstance(l, str) else l
+                           for l in skip_connection_layers_2]
 
     # Extract skip connections from both backbones
-    skip1 = [backbone1.layers[idx].output for idx in skip_connection_idx1]
-    skip2 = [backbone2.layers[idx].output for idx in skip_connection_idx2]
+    skip_layers_list_1 = [backbone1.layers[skip_connection_idx_1[i]].output for i in range(len(skip_connection_idx_1))]
+    skip_layers_list_2 = [backbone2.layers[skip_connection_idx_2[i]].output for i in range(len(skip_connection_idx_2))]
 
-    downsampling_idx1 = ([get_layer_number(backbone1, l) if isinstance(l, str) else l
-                               for l in downsampling_layers1])
-    downsampling_list1 = [backbone1.layers[downsampling_idx1[i]].output for i in range(len(downsampling_idx1))]
+    downsampling_idx_1 = ([get_layer_number(backbone1, l) if isinstance(l, str) else l
+                               for l in downsampling_layers_1])
+    downsampling_list_1 = [backbone1.layers[downsampling_idx_1[i]].output for i in range(len(downsampling_idx_1))]
 
-    downsampling_idx2 = ([get_layer_number(backbone2, l) if isinstance(l, str) else l
-                               for l in downsampling_layers2])
-    downsampling_list2 = [backbone2.layers[downsampling_idx2[i]].output for i in range(len(downsampling_idx2))]
+    downsampling_idx_2 = ([get_layer_number(backbone2, l) if isinstance(l, str) else l
+                               for l in downsampling_layers_2])
+    downsampling_list_2 = [backbone2.layers[downsampling_idx_2[i]].output for i in range(len(downsampling_idx_2))]
 
-    downterm = [None] * (n_upsample_blocks+1)
-############################################
-    # Combine skip connections 
-    combined_skips = [Concatenate()([s1, s2]) for s1, s2 in zip(skip1, skip2)]
-
-    if attention:
-        print('With Attention')
-        features1 = cbam.attach_attention_module(backbone1.output)
-        features2 = cbam.attach_attention_module(backbone2.output)
-        x = [features1, features2]
-    else:
-        x = [backbone1.output, backbone2.output]
-
-    if strategy == 'concat':
-        x = Concatenate()(x)
-    elif strategy == 'average':
-        x = fusion.WeightedAverage(n_output=len(x))(x)
-
-    for i in range(n_upsample_blocks):
-        skip_connection = combined_skips[i] if i < len(combined_skips) else None
-
-        upsample_rate = to_tuple(upsample_rates[i])
-
-        if decoder_block_type == 'transpose':
-            x = Transpose2D_block(decoder_filters[i], i, upsample_rate=upsample_rate,
-                                  skip=skip_connection, use_batchnorm=decoder_use_batchnorm)(x)
+    downterm_1 = [None] * (n_upsample_blocks+1)
+    for i in range(len(downsampling_idx_1)):
+        if downsampling_list_1[0] == backbone1.output:
+            downterm_1[n_upsample_blocks-i] = downsampling_list_1[i]
         else:
-            x = Upsample2D_block(decoder_filters[i], i, upsample_rate=upsample_rate,
-                                 skip=skip_connection, use_batchnorm=decoder_use_batchnorm)(x)
+            downterm_1[n_upsample_blocks-i-1] = downsampling_list_1[i]
+    downterm_1[-1] = backbone1.output
 
-    # Final layers
-    x = Conv2D(classes, (3, 3), padding='same', name='final_conv')(x)
+    downterm_2 = [None] * (n_upsample_blocks+1)
+    for i in range(len(downsampling_idx_2)):
+        if downsampling_list_2[0] == backbone2.output:
+            downterm_2[n_upsample_blocks-i] = downsampling_list_2[i]
+        else:
+            downterm_2[n_upsample_blocks-i-1] = downsampling_list_2[i]
+    downterm_2[-1] = backbone2.output
+
+    downterm = [Concatenate()([d1, d2]) if d1 is not None else d2 for d1, d2 in zip(downterm_1, downterm_2)]
+
+    # interm is a 2-dimensional grid of intermediate decoder features in X-Net.
+    interm_1 = [None] * (n_upsample_blocks+1) * (n_upsample_blocks+1)
+    for i in range(len(skip_connection_idx_1)):
+        interm_1[-i*(n_upsample_blocks+1)+(n_upsample_blocks+1)*(n_upsample_blocks-1)] = skip_layers_list_1[i]
+    interm_1[(n_upsample_blocks+1)*n_upsample_blocks] = backbone1.output
+
+    interm_2 = [None] * (n_upsample_blocks+1) * (n_upsample_blocks+1)
+    for i in range(len(skip_connection_idx_2)):
+        interm_2[-i*(n_upsample_blocks+1)+(n_upsample_blocks+1)*(n_upsample_blocks-1)] = skip_layers_list_2[i]
+    interm_2[(n_upsample_blocks+1)*n_upsample_blocks] = backbone2.output
+
+    # Apply attention to each element of the intermediate grid
+    if attention:
+        interm_1 = [cbam.attach_attention_module(f) if f is not None else None for f in interm_1]
+        interm_2 = [cbam.attach_attention_module(f) if f is not None else None for f in interm_2]
+        print('With Attention')
+
+    if strategy == 'average':
+        interm = [fusion.WeightedAverage(n_inputs=2)([x1, x2]) for x1, x2 in zip(interm_1, interm_2)]
+    else: #strategy == 'concat'
+        interm = [Concatenate()(inputs=[x1, x2]) if x1 is not None else x2 for x1, x2 in zip(interm_1, interm_2)]
+
+    for j in range(n_upsample_blocks):
+        for i in range(n_upsample_blocks-j):
+            upsample_rate = to_tuple(upsample_rates[i])
+            
+            if i == 0 and j < n_upsample_blocks-1 and len(skip_connection_layers_1) < n_upsample_blocks:   
+                interm[(n_upsample_blocks+1)*i+j+1] = None
+            elif j == 0:
+                if downterm[i+1] is not None:
+                    interm[(n_upsample_blocks+1)*i+j+1] = up_block(decoder_filters[n_upsample_blocks-i-2], 
+                                      i+1, j+1, upsample_rate=upsample_rate,
+                                      skip=interm[(n_upsample_blocks+1)*i+j], 
+                                      use_batchnorm=decoder_use_batchnorm)(downterm[i+1])  
+                else:
+                    interm[(n_upsample_blocks+1)*i+j+1] = None
+            else:
+                interm[(n_upsample_blocks+1)*i+j+1] = up_block(decoder_filters[n_upsample_blocks-i-2], 
+                                  i+1, j+1, upsample_rate=upsample_rate,
+                                  skip=interm[(n_upsample_blocks+1)*i : (n_upsample_blocks+1)*i+j+1], 
+                                  use_batchnorm=decoder_use_batchnorm)(interm[(n_upsample_blocks+1)*(i+1)+j])
+
+    x = Conv2D(classes, (3,3), padding='same', name='final_conv')(interm[n_upsample_blocks])  # interm[n_upsample_blocks]) is just one “diagonal” element of the 2D interm grid.  OR instead fuse all elements from the last row or column of interm before the final conv
     x = Activation(activation, name=activation)(x)
 
-    # Create the model
     model = Model([backbone1.input, backbone2.input], x)
- 
 
     # lock encoder weights for fine-tuning
-  #  if freeze_encoder:
-   #     freeze_model(backbone)
+    #if freeze_encoder:
+    #    freeze_model(backbone)
 
     return model
+
 
 
 ######### utils

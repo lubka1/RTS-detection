@@ -110,7 +110,8 @@ def Xnet(backbone_name='vgg16',
          n_upsample_blocks=5,
          upsample_rates=(2,2,2,2,2),
          classes=1,
-         activation='sigmoid'):
+         activation='sigmoid',
+        transfer_learning=False):
     """
 
     Args:
@@ -141,8 +142,43 @@ def Xnet(backbone_name='vgg16',
     backbone = get_backbone(backbone_name,
                             input_shape=input_shape,
                             input_tensor=input_tensor,
-                            weights=encoder_weights,
+                            weights=None,
                             include_top=False)
+    
+    if transfer_learning:
+        imagenet_backbone = get_backbone(
+            backbone_name,
+            input_shape=(224, 224, 3),
+            weights='imagenet',
+            include_top=False
+        )
+        imagenet_first_conv = imagenet_backbone.layers[1]
+        for layer in imagenet_backbone.layers:
+            if isinstance(layer, Conv2D):
+                imagenet_first_conv = layer
+                break
+        imagenet_weights = imagenet_first_conv.get_weights()[0]
+        for layer in backbone.layers:
+            if isinstance(layer, Conv2D):
+                first_conv = layer
+                break
+        n_channels = input_shape[-1]
+        new_weights = np.zeros((imagenet_weights.shape[0], imagenet_weights.shape[1], n_channels, imagenet_weights.shape[3]))
+
+        #  Randomly pick three channels from input to assign ImageNet weights
+        random_indices = np.random.choice(n_channels, 3, replace=False)
+        for i, idx in enumerate(random_indices):
+            new_weights[:, :, idx, :] = imagenet_weights[:, :, i, :]
+
+        # Assign the mean to all remaining channels
+        mean_weights = np.mean(new_weights[:, :, random_indices, :], axis=2, keepdims=True)
+        for c in range(n_channels):
+            if c not in random_indices:
+                new_weights[:, :, c, :] = mean_weights[:, :, 0, :]
+
+        first_conv.set_weights([new_weights])
+
+    
 
     if skip_connections == 'default':
         skip_connections = DEFAULT_SKIP_CONNECTIONS[backbone_name]
