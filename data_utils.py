@@ -317,6 +317,7 @@ class EarlyDataset:
 
         image = np.concatenate((s1_image, s2_image), axis=-1)
         
+        image = np.array(image, dtype=np.float32) # 15.12.................................................................................................
 
         mask = read_tif(self.masks_fps[i], as_gray=True)
         mask_array = np.array(mask)
@@ -365,14 +366,17 @@ class Dataloder(keras.utils.Sequence):
         # collect batch data
         start = i * self.batch_size
         stop = (i + 1) * self.batch_size
-        data = []
-        for j in range(start, stop):
-            data.append(self.dataset[j])
-        
+        #data = []
+        #for j in range(start, stop):
+        #    data.append(self.dataset[j])
+          
         # transpose list of lists
         #batch = [np.stack(samples, axis=0) for samples in zip(*data)]
         
         #return batch
+        data = [self.dataset[j] for j in range(start, stop)]
+        for d in data:
+            print(type(d[0]), getattr(d[0], "dtype", None), getattr(d[0], "shape", None))
 
         # Convert each sample to tensor first
         images = [tf.convert_to_tensor(d[0], dtype=tf.float32) for d in data]
