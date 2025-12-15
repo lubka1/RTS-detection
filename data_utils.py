@@ -467,7 +467,7 @@ class FusionDataloder(Dataloder):
         data = [self.dataset[i] for i in self.indexes[start:stop]]
         
         images1, images2, masks = [], [], []
-        
+        '''
         for (image1, image2), mask in data:
             images1.append(image1)
             images2.append(image2)
@@ -477,10 +477,12 @@ class FusionDataloder(Dataloder):
         images1 = np.array(images1)
         images2 = np.array(images2)
         masks = np.stack(masks, axis=0)
-        
-        #return (images1, images2), masks
-        return (
-            tf.convert_to_tensor(images1, dtype=tf.float32),
-            tf.convert_to_tensor(images2, dtype=tf.float32),
-        ), tf.convert_to_tensor(masks, dtype=tf.float32)
+        '''
+        for (im1, im2), mask in data:
+            images1.append(tf.convert_to_tensor(im1, dtype=tf.float32))
+            images2.append(tf.convert_to_tensor(im2, dtype=tf.float32))
+            masks.append(tf.convert_to_tensor(mask, dtype=tf.float32))
+
+        return (images1, images2), masks
+
 
