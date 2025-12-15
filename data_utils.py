@@ -372,8 +372,7 @@ class Dataloder(keras.utils.Sequence):
         # transpose list of lists
         batch = [np.stack(samples, axis=0) for samples in zip(*data)]
         
-        #return batch
-        return [tf.convert_to_tensor(b, dtype=tf.float32) for b in batch]
+        return batch
 
     
     
