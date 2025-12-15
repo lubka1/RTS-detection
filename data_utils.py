@@ -375,15 +375,18 @@ class Dataloder(keras.utils.Sequence):
         
         #return batch
         data = [self.dataset[j] for j in range(start, stop)]
-        for d in data:
-            print(type(d[0]), getattr(d[0], "dtype", None), getattr(d[0], "shape", None))
+        images = [
+            tf.convert_to_tensor(np.ascontiguousarray(d[0], dtype=np.float32), dtype=tf.float32)
+            for d in data
+        ]
+        masks = [
+            tf.convert_to_tensor(np.ascontiguousarray(d[1], dtype=np.float32), dtype=tf.float32)
+            for d in data
+        ]
 
-        # Convert each sample to tensor first
-        images = [tf.convert_to_tensor(d[0], dtype=tf.float32) for d in data]
-        masks  = [tf.convert_to_tensor(d[1], dtype=tf.float32) for d in data]
-        # Now batch them along axis 0
+        # Stack along batch axis
         images = tf.stack(images, axis=0)
-        masks  = tf.stack(masks, axis=0)
+        masks = tf.stack(masks, axis=0)
 
         return images, masks
 
