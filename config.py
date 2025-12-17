@@ -51,7 +51,7 @@ activation = 'sigmoid'
 optim = keras.optimizers.Adam(LR)
 
 # add attention, fusion, and unet xnet options here?
-TL = False  # True False
+TL = True  # True False
 ATTENTION = False    # True False
 STRATEGY = 'concat'  # 'concat' 'average'
 
