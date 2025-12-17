@@ -39,8 +39,8 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 
 # Training Parameters
 BACKBONE = 'resnet50' 
-BATCH_SIZE = 16   #32        16         16
-LR = 0.0002    #0.0005      0.0001        0.001     0.00001
+BATCH_SIZE = 32   #32        16         16
+LR = 0.001    #0.0005      0.0001        0.001     0.00001
 EPOCHS = 50
 
 patienceRLR = 6 # patience for ReduceLearningRate
@@ -56,8 +56,8 @@ ATTENTION = False    # True False
 STRATEGY = 'concat'  # 'concat' 'average'
 
 # the authors write "we found γ=2 to work best in our experiments."
-alpha = 0.9   #0.9   Class 1 (thaw slump) gets higher weight
-gamma = 2.0   # Focus more on hard-to-classify areas when higher, default 2, 
+alpha = 0.8   #0.9   Class 1 (thaw slump) gets higher weight
+gamma = 3.0   # Focus more on hard-to-classify areas when higher, default 2, 
 focal_loss = sm.losses.BinaryFocalLoss(alpha=alpha, gamma=gamma)
 dice_loss = sm.losses.DiceLoss()
 total_loss = focal_loss + dice_loss 
