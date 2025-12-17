@@ -12,10 +12,8 @@ def ResNet50(input_shape, input_tensor=None, weights=None, classes=1000, include
                          include_top=include_top,
                          name_prefix='one')  
     model.name = 'resnet50'
-    print('initialize resnet50')
+    print('Initialize resnet50')
 
-    #if weights:
-    #    load_model_weights(weights_collection, model, weights, classes, include_top)
     return model
 
 def MidResNet50(input_shape, input_tensor=None, weights=None, classes=1000, include_top=True):
@@ -28,6 +26,4 @@ def MidResNet50(input_shape, input_tensor=None, weights=None, classes=1000, incl
     model.name = 'midresnet50'
     print('initialize MIDresnet50')
 
-    #if weights:
-     #   load_model_weights(weights_collection, model, weights, classes, include_top)
     return model

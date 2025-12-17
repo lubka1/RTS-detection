@@ -39,9 +39,9 @@ DEM_test = os.path.join(DATA_DIR, 'test', 'DEM')
 
 # Training Parameters
 BACKBONE = 'resnet50' 
-BATCH_SIZE = 4   #32        16         16
+BATCH_SIZE = 16   #32        16         16
 LR = 0.0002    #0.0005      0.0001        0.001     0.00001
-EPOCHS = 1
+EPOCHS = 50
 
 patienceRLR = 6 # patience for ReduceLearningRate
 factor = 0.5
@@ -51,9 +51,9 @@ activation = 'sigmoid'
 optim = keras.optimizers.Adam(LR)
 
 # add attention, fusion, and unet xnet options here?
-TL = True  # True False
-ATTENTION = True    # True False
-STRATEGY = 'average'  # 'concat' 'average'
+TL = False  # True False
+ATTENTION = False    # True False
+STRATEGY = 'concat'  # 'concat' 'average'
 
 # the authors write "we found γ=2 to work best in our experiments."
 alpha = 0.9   #0.9   Class 1 (thaw slump) gets higher weight

@@ -103,8 +103,8 @@ def train_model(fusion_type):
         epochs=EPOCHS, 
         callbacks=callbacks, 
         validation_data=val_dataloader, 
-        workers=0,
-        use_multiprocessing=False,
+        #workers=0,
+        #use_multiprocessing=False,
     )
     elapsed_time = time.time() - start_time
     print('Training complete. Elapsed time: '+str(elapsed_time))

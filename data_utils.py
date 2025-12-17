@@ -366,29 +366,15 @@ class Dataloder(keras.utils.Sequence):
         # collect batch data
         start = i * self.batch_size
         stop = (i + 1) * self.batch_size
-        #data = []
-        #for j in range(start, stop):
-        #    data.append(self.dataset[j])
+        data = []
+        for j in range(start, stop):
+            data.append(self.dataset[j])
           
         # transpose list of lists
-        #batch = [np.stack(samples, axis=0) for samples in zip(*data)]
+        batch = [np.stack(samples, axis=0) for samples in zip(*data)]
         
-        #return batch
-        data = [self.dataset[j] for j in range(start, stop)]
-        images = [
-            tf.convert_to_tensor(np.ascontiguousarray(d[0], dtype=np.float32), dtype=tf.float32)
-            for d in data
-        ]
-        masks = [
-            tf.convert_to_tensor(np.ascontiguousarray(d[1], dtype=np.float32), dtype=tf.float32)
-            for d in data
-        ]
+        return batch
 
-        # Stack along batch axis
-        images = tf.stack(images, axis=0)
-        masks = tf.stack(masks, axis=0)
-
-        return images, masks
 
     
     
@@ -482,7 +468,7 @@ class FusionDataloder(Dataloder):
         data = [self.dataset[i] for i in self.indexes[start:stop]]
         
         images1, images2, masks = [], [], []
-        '''
+        
         for (image1, image2), mask in data:
             images1.append(image1)
             images2.append(image2)
@@ -492,12 +478,7 @@ class FusionDataloder(Dataloder):
         images1 = np.array(images1)
         images2 = np.array(images2)
         masks = np.stack(masks, axis=0)
-        '''
-        for (im1, im2), mask in data:
-            images1.append(tf.convert_to_tensor(im1, dtype=tf.float32))
-            images2.append(tf.convert_to_tensor(im2, dtype=tf.float32))
-            masks.append(tf.convert_to_tensor(mask, dtype=tf.float32))
-
+        
         return (images1, images2), masks
 
 
