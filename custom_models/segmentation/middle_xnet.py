@@ -239,7 +239,11 @@ def MiddleXnet(backbone_name1='vgg16', backbone_name2='vgg16',
         print('With Attention')
 
     if strategy == 'average':
-        interm = [fusion.WeightedAverage(n_output=2)([x1, x2]) for x1, x2 in zip(interm_1, interm_2)]
+        interm = [
+            fusion.WeightedAverage(n_output=sum(x is not None for x in [x1, x2]))([x for x in [x1, x2] if x is not None])
+            if x1 is not None or x2 is not None else None
+            for x1, x2 in zip(interm_1, interm_2)
+        ]
     else: #strategy == 'concat'
         interm = [Concatenate()(inputs=[x1, x2]) if x1 is not None else x2 for x1, x2 in zip(interm_1, interm_2)]
 
