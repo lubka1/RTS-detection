@@ -11,12 +11,11 @@ import tensorflow as tf
 
 
 BACKBONE = config.BACKBONE
-BATCH_SIZE = config.BATCH_SIZE
 preprocess_input = sm.get_preprocessing(BACKBONE)
 
 # DATA LOADING
 
-def get_data(fusion_type):  
+def get_data(fusion_type, batch_size):  
         
         if fusion_type == 'early':
 
@@ -48,12 +47,12 @@ def get_data(fusion_type):
             N = image.shape[-1]
             M = None
 
-            train_dataloader = Dataloder(train_dataset, batch_size=BATCH_SIZE, shuffle=True)   
+            train_dataloader = Dataloder(train_dataset, batch_size=batch_size, shuffle=True)   
             valid_dataloader = Dataloder(val_dataset, batch_size=1, shuffle=False)
 
-            if train_dataloader[0][0].shape != (BATCH_SIZE, 256, 256, N):
+            if train_dataloader[0][0].shape != (batch_size, 256, 256, N):
                 raise ValueError(f"Input shape: {train_dataloader[0][0].shape}, expected: (BATCH_SIZE, 256, 256, {N})")
-            if train_dataloader[0][1].shape != (BATCH_SIZE, 256, 256, 1):
+            if train_dataloader[0][1].shape != (batch_size, 256, 256, 1):
                 raise ValueError(f"Output shape: {train_dataloader[0][1].shape}, expected: (BATCH_SIZE, 256, 256, 1)")
             
         elif fusion_type in ['middle', 'late']:
@@ -80,7 +79,7 @@ def get_data(fusion_type):
              ndvi=True  # Include NDVI if used in training
             )
 
-            train_dataloader = FusionDataloder(train_dataset, BATCH_SIZE, shuffle=True)
+            train_dataloader = FusionDataloder(train_dataset, batch_size, shuffle=True)
             valid_dataloader = FusionDataloder(val_dataset, 1, shuffle=False)  # No shuffling for validation
 
             # Determine the number of channels in the images
@@ -92,14 +91,14 @@ def get_data(fusion_type):
             print(train_dataloader[0][0][0].shape)
             print(train_dataloader[0][0][1].shape)
 
-            if train_dataloader[0][0][0].shape != (BATCH_SIZE, 256, 256, M):
-                raise ValueError(f"Expected image1 shape {(BATCH_SIZE, 256, 256, M)}, but got {train_dataloader[0][0][0].shape}")
+            if train_dataloader[0][0][0].shape != (batch_size, 256, 256, M):
+                raise ValueError(f"Expected image1 shape {(batch_size, 256, 256, M)}, but got {train_dataloader[0][0][0].shape}")
 
-            if train_dataloader[0][0][1].shape != (BATCH_SIZE, 256, 256, N):
-                raise ValueError(f"Expected image2 shape {(BATCH_SIZE, 256, 256, N)}, but got {train_dataloader[0][0][1].shape}")
+            if train_dataloader[0][0][1].shape != (batch_size, 256, 256, N):
+                raise ValueError(f"Expected image2 shape {(batch_size, 256, 256, N)}, but got {train_dataloader[0][0][1].shape}")
 
-            if train_dataloader[0][1].shape != (BATCH_SIZE, 256, 256, 1):
-                raise ValueError(f"Expected mask shape {(BATCH_SIZE, 256, 256, 1)}, but got {train_dataloader[0][1].shape}")
+            if train_dataloader[0][1].shape != (batch_size, 256, 256, 1):
+                raise ValueError(f"Expected mask shape {(batch_size, 256, 256, 1)}, but got {train_dataloader[0][1].shape}")
 
         return train_dataloader, valid_dataloader, N, M
 '''

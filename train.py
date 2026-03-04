@@ -25,7 +25,7 @@ else:
     print("[INFO] No GPU detected. Training will use CPU.")
 
 BACKBONE = config.BACKBONE
-BATCH_SIZE = config.BATCH_SIZE
+batch_size = config.BATCH_SIZE
 LR = config.LR
 EPOCHS = config.EPOCHS
 patienceRLR = config.patienceRLR
@@ -38,7 +38,7 @@ ATTENTION = config.ATTENTION
 TL = config.TL
 
 
-def train_model(fusion_type):
+def train_model(fusion_type, batch_size):
         
     """
     Train the fusion model based on selected configuration.
@@ -62,7 +62,7 @@ def train_model(fusion_type):
         config={
             "fusion_type": fusion_type,
             "epochs": EPOCHS,
-            "batch_size": BATCH_SIZE,
+            "batch_size": batch_size,
             "learning_rate": LR,
             "backbone": BACKBONE,
             "strategy": STRATEGY,
@@ -74,7 +74,7 @@ def train_model(fusion_type):
         #settings=wandb.Settings(_disable_stats=True)  # Asynchronous upload and no summary stats (system metrics like CPU/GPU usage, memory usage)
     )
 
-    train_dataloader, val_dataloader, N, M = data_utils.get_data(fusion_type)
+    train_dataloader, val_dataloader, N, M = data_utils.get_data(fusion_type, batch_size)
 
     model = utils.load_model(fusion_type, N, M)  
 

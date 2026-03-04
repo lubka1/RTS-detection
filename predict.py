@@ -17,7 +17,7 @@ def denormalize(image):
     """Denormalize image if necessary (scaling back to [0, 255] range)."""
     return image * 255.0
 
-def main(fusion_type, model_path, strategy='concat', n=None):
+def main(fusion_type, model_path, strategy='average', n=None):
     """Loads a trained model and predicts on n images from the test set."""
     
     # Load test dataset
@@ -37,7 +37,7 @@ def main(fusion_type, model_path, strategy='concat', n=None):
     N = images2.shape[-1]  
     
     # Load the model with the trained weights
-    model = utils.load_model(fusion_type, N, M, strategy, model_path)
+    model = utils.load_model(fusion_type, N, M, model_path)
 
     # Compile the model (same as during training setup)
     model.compile(optimizer=config.optim,  
