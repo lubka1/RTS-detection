@@ -18,7 +18,7 @@ def sweep_train():
         name=f"grid_search",  
         config={
             "fusion_type": "early",
-            "epochs": 1,
+            "epochs": 30,
             "backbone": 'resnet50',
             "transfer_learning": False
         },
